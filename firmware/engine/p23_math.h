@@ -10,6 +10,9 @@ PM_INLINE int32_t pm_abs(int32_t x) { return x<0?-x:x; }
 PM_INLINE int32_t pm_product(int32_t a,int32_t b) { return (int32_t)(((int64_t)a*b)>>15); }
 /* Fixed shifts keep the target free of 64-bit division runtime calls. */
 PM_INLINE int32_t pm_q16(int32_t a,int32_t b) { return (int32_t)(((int64_t)a*b)>>16); }
+/* x / 2^k exactly as C divides (toward zero), in shifts: the target's compiler keeps a divide instruction for a
+ * signed division by a power of two (the per-sample code's: the same results, bit for bit) */
+PM_INLINE int32_t pm_sdiv(int32_t x,uint32_t k) { return (x+((x>>31)&(int32_t)((1u<<k)-1u)))>>k; }
 PM_INLINE int32_t pm_soft(int32_t x)
 {
     int32_t a=pm_abs(x), t;

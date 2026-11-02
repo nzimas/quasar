@@ -1316,7 +1316,34 @@ static void pat_save_as(uint32_t k)
     }
     if (k == pat_cur)
         rc = pat_save(k);
-    else {
+    else if (!perf_on) {                         /* (Quasar: the slot saved into is the pattern playing from now on,
+                                                  * as it plays -- its loops on where they are; the one left keeps what
+                                                  * it held, its mutes too: the changes went to k) */
+        uint32_t i, from = pat_cur;
+        lr = lp_copy_pat(from, k);
+        pat_take(&pat_store[k]);
+        pat_dirtyv[k] = 0;
+        for (i = 0; i < NLP; i++)
+            if (lps[i].pat == k) {
+                const loop_t *o = lp_at(from, lps[i].t, lps[i].l);
+                if (o) {
+                    lps[i].cur = o->cur;
+                    lps[i].anchor = o->anchor;
+                    lps[i].kick = o->kick;
+                }
+            }
+        RING_PUBLISH();
+        seq_lpat = (uint8_t)k;
+        if (seq_pend == 1u && seq_pend_k == k) {   /* (it was waiting to play: it plays) */
+            seq_pend = 0;
+            RING_PUBLISH();
+        }
+        pat_cur = (uint8_t)k;
+        pat_dirty = 0;
+        px_take(px_base);
+        prj_dirty = 1;
+        rc = pat_flush(k);
+    } else {
         lr = lp_copy_pat(pat_cur, k);            /* (its loops too: build 73) */
         pat_take(&pat_store[k]);
         pat_dirtyv[k] = 0;
@@ -2103,7 +2130,7 @@ static void prj_quick_save(void)
 }
 
 /* PERFORMANCE (the 7th black key; ui.c): the state playing kept as it goes on -- the session's (every sound, the
- * panel, the STUTTER, levels, pans, mutes, chords, arpeggiators, tempo, scale), the steps whole, the pattern's slot in
+ * panel, TRANSFORM, levels, pans, mutes, chords, arpeggiators, tempo, scale), the steps whole, the pattern's slot in
  * the store and what was changed -- and given back as it goes off: nothing done meanwhile stays, but the patterns
  * saved meanwhile on the PATTERNS grid (what plays kept as a pattern) and, with each, the session as it played then
  * (sounds, effects, tempo, scale: perf_keep) -- what came after the last one given back. Sessions, and switching patterns, wait till it is off (ui.c, pat_switch,

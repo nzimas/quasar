@@ -15,10 +15,12 @@ The 1st public build. The Pulsar-23 recreated as a whole instrument, then pushed
 - **Sounds.** 147 families drawn at random, all percussive; 4 macros on the main knobs; 4
   internal routes per sound (SHAOS, the LFO, the dividers, noise, FX outputs, any track's output or envelope); a
   per-voice drive; WRECK (fold, ring, crush, bits) after every voice.
-- **STUTTER** on the 6th black key, apart from the FX: SHIFT and the key held repeat the slice just heard; its page
-  has SLICE, RATE, MODE, DECAY (each with RND), DRIFT, ROLL and MIX. The key is lit dimly.
+- **TRANSFORM** on the 6th black key: SHIFT and the key held put a random stack of DRIVE, FOLD, RING, CRUSH and BITS
+  over 2 to 6 tracks, without touching the steps. Its page has TRACKS, STACK, DEPTH and MIX (at first ALL, 2, 60,
+  100), each with RND first. The key is lit dimly. (It replaces the STUTTER of
+  the first build 3 package.)
 - **BREAK** has 10 ways (REPEAT, HALF TIME, DOUBLE, REVERSE, CHOP, ROLL, SHUFFLE, POLY, JUMP, SKIP) and layers drawn
-  at random: ratchets up to 8, octave leaps, flams, accents, RISE, WRECK, STUT, GHOST. Nothing drops out.
+  at random: ratchets up to 8, octave leaps, flams, accents, RISE, WRECK, XFM (TRANSFORM for a beat or so), GHOST. Nothing drops out.
 - **Phrases**: polymeters, tracks on their own clock and direction, crossed Euclidean layers, ratchets, hits late or
   graced, walking velocities; their locks reach WRECK.
 - **PERFORMANCE** on the 7th black key: the state kept, everything changed put back as it goes off; the main knobs
@@ -26,9 +28,13 @@ The 1st public build. The Pulsar-23 recreated as a whole instrument, then pushed
   clocks, transposition, new sounds and EDIT pages on every track). A pattern saved while it is on keeps what plays,
   and the sounds of that moment stay in the session.
 - **Sessions** on a grid like the patterns': a white key loads its session, held it saves there.
+- **Patterns**: saved into another slot, that slot plays from then on, and the pattern saved from keeps what it held,
+  its mutes included.
 - The pages Quasar cannot use without cables (CLOCK, LOOPER, ATTEN, CV, PATCH) are hidden; the clock follows the
   session tempo.
 - The output is written at full scale into a soft clip: Quasar is loud.
+- Pages come up faster: the screen is drawn into two buffers in turn, one drawn while the other is sent. The
+  engine divides by shifts where the FM-1's compiler kept slow divide instructions; the sound is the same, bit for bit.
 
 ## Builds 1 and 2 -- October 2026
 

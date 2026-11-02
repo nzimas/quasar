@@ -17,7 +17,11 @@ typedef struct {
 #define C_GREY RGB(110, 110, 110)
 
 #define CV_MAX (240u * 56u)     /* (a quarter of the screen: taller areas are drawn a band at a time, CV_AREA) */
-static uint16_t cv_px[CV_MAX] POOL;
+/* (Quasar) two canvases in turn: a band is drawn into one while the last goes out of the other (its DMA), so a page
+ * comes up as fast as the panel takes it, whatever the audio leaves the main loop */
+static uint16_t cv_buf[2][CV_MAX] POOL;
+static uint16_t *cv_px = cv_buf[0];
+static const uint16_t *cv_sent;  /* (the canvas the last transfer reads) */
 static uint32_t cv_w, cv_h;
 static int32_t cv_oy;            /* the band's top within the area being drawn (CV_AREA): drawing is placed by the area */
 static uint16_t cv_bg;
@@ -29,7 +33,7 @@ static void cv_begin(uint32_t w, uint32_t h, uint16_t bg)
     uint32_t i, n;
     if (w * h > CV_MAX)
         h = CV_MAX / w;
-    lcd_sync();                       /* the last transfer may still read the canvas */
+    cv_px = cv_sent == cv_buf[0] ? cv_buf[1] : cv_buf[0];   /* (not the one the last transfer may still read) */
     cv_w = w;
     cv_h = h;
     cv_bg = bg;
@@ -70,7 +74,11 @@ static void cv_area_next(void)
     cv_oy += (int32_t)cv_h;
 }
 #define CV_AREA(x, y, w, h, bg) for (cv_area_start(x, y, w, h, bg); cv_area_left(); cv_area_next())
-static void cv_blit(uint32_t x, uint32_t y) { lcd_blit(x, y, cv_w, cv_h, cv_px); }
+static void cv_blit(uint32_t x, uint32_t y)
+{
+    lcd_blit(x, y, cv_w, cv_h, cv_px);        /* (waits for the last transfer, from the other canvas, first) */
+    cv_sent = cv_px;
+}
 
 static void cv_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
 {

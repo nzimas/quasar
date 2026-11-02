@@ -546,13 +546,13 @@ static uint32_t seq_next(uint32_t t, uint32_t len)
 /* Quasar adds ways after breakcore and Autechre -- SHUFFLE (the bar's 16 steps in another order), POLY (each track
  * round its own odd window: 3, 5, 6, 7 or 9 steps against the bar), JUMP (each beat a leap to another), SKIP (the
  * steps read 3, 5, 7, 9 or 11 at a time through the bar) -- and layers: RISE (each hit climbing in pitch through the
- * half bar), WRECK (a hit's sound folded, crushed, its bits dropped or rung), STUT (the STUTTER thrown in for a beat
- * or so), GHOST (soft hits on empty steps). No gap: the music never drops out. Held, the plan is drawn again about
+ * half bar), WRECK (a hit's sound folded, crushed, its bits dropped or rung), XFM (TRANSFORM thrown in for a beat
+ * or so, as its page sets it, over the tracks under the break), GHOST (soft hits on empty steps). No gap: the music never drops out. Held, the plan is drawn again about
  * every other bar, so a long break keeps turning */
 enum { BR_REPEAT, BR_HALF, BR_DOUBLE, BR_REVERSE, BR_CHOP, BR_ROLL, BR_SHUFFLE, BR_POLY, BR_JUMP, BR_SKIP, NBR };
 static const char *const BR_NAME[NBR] = {"REPEAT", "HALF TIME", "DOUBLE", "REVERSE", "CHOP", "ROLL", "SHUFFLE", "POLY",
                                          "JUMP", "SKIP"};
-enum { BL_RAT = 1, BL_OCT = 2, BL_FLAM = 4, BL_RISE = 8, BL_ACC = 16, BL_WRECK = 32, BL_STUT = 64, BL_GHOST = 128 };
+enum { BL_RAT = 1, BL_OCT = 2, BL_FLAM = 4, BL_RISE = 8, BL_ACC = 16, BL_WRECK = 32, BL_XFM = 64, BL_GHOST = 128 };
 #define PL_WRECK (4u*8u)                         /* (page 4: params.c's PG_WRECK -- FOLD, RING, RING FRQ, CRUSH, BITS) */
 static volatile uint8_t brk_mask;                /* (the main loop's: the tracks under the break; 0 none) */
 static volatile uint16_t brk_kick, brk_drum, brk_keep;   /* (.. the kicks, the drums, the drones: as the press found
@@ -570,8 +570,8 @@ static int8_t brk_oct[NLANE];
 static uint8_t brk_perm[16], brk_pw[NLANE], brk_jump[NLANE], brk_mul, brk_semi[NLANE], brk_wk[NLANE], brk_gh[NLANE];
 static uint8_t brk_lid[NLANE][NPL];              /* (a wrecked hit's locks: its step's, and the wreck's) */
 static int16_t brk_lv[NLANE][NPL];
-static volatile uint8_t brk_st_left;             /* (STUT: the 16ths the break's stutter has still to hold) */
-static p23_stutter brk_st;
+static volatile uint8_t brk_xf_left;             /* (XFM: the 16ths the break's TRANSFORM has still to hold) */
+static p23_transform brk_xf;
 static uint8_t brk_last;                         /* (the tracks under it as the last block ended) */
 static uint32_t brk_rnd(uint32_t n)
 {
@@ -627,7 +627,7 @@ static void brk_tick(void)                       /* (each of the tempo's 16ths, 
 {
     if (!brk_mask) {
         brk_shown = 0xFF;
-        brk_st_left = 0;
+        brk_xf_left = 0;
         return;
     }
     if (brk_seed != brk_seen) {                  /* pressed: a plan */
@@ -641,18 +641,11 @@ static void brk_tick(void)                       /* (each of the tempo's 16ths, 
     brk_since++;
     if (!(brk_n16 % 16u) && brk_rnd(100) < 45u)  /* (held on: another plan about every other bar) */
         brk_draw();
-    if (brk_st_left)                             /* STUT: the break's stutter held a 16th more, or let go */
-        brk_st_left--;
-    else if ((brk_lay & BL_STUT) && !(brk_n16 % 4u) && brk_rnd(100) < 35u) {
-        static const uint8_t SL[4] = {0, 0, 1, 4}, RT[5] = {64, 64, 48, 80, 34}, DR[3] = {64, 40, 92};
-        brk_st.slice = SL[brk_rnd(4)];
-        brk_st.rate = RT[brk_rnd(5)];
-        brk_st.mode = (uint8_t)brk_rnd(4);
-        brk_st.decay = (uint8_t)brk_rnd(60);
-        brk_st.drift = DR[brk_rnd(3)];
-        brk_st.roll = (uint8_t)(brk_rnd(2) ? 60u + brk_rnd(60) : 0u);
-        brk_st.mix = 127;
-        brk_st_left = (uint8_t)(1u + brk_rnd(4));
+    if (brk_xf_left)                             /* XFM: the break's TRANSFORM held a 16th more, or let go */
+        brk_xf_left--;
+    else if ((brk_lay & BL_XFM) && !(brk_n16 % 4u) && brk_rnd(100) < 35u) {
+        xf_draw(brk_mask, (brk_rnd(60000u) + 1u) * 2654435761u + brk_n16, &brk_xf);
+        brk_xf_left = (uint8_t)(2u + brk_rnd(4));
     }
 }
 /* the way's step for step p of len, from anchor a (a beat) */
@@ -1655,8 +1648,8 @@ static void mix_block(int32_t *out)
         was_run=seq_run; pnl_run=seq_run;
     }
     p23_global_from_frontend();
-    if(brk_st_left) p23_set_stutter(&brk_st);      /* (a break's own stutter, while it holds) */
-    p23_stutter_hold(stut_ui || brk_st_left);
+    if(brk_xf_left && !xf_ui) p23_set_transform(&brk_xf);   /* (a break's own TRANSFORM, while it holds) */
+    p23_transform_hold(xf_ui || brk_xf_left);
     for(lane=0;lane<NLANE;lane++) {
         /* the lane's patch again only when what makes it changed: a sound published, a note (its locks), the
          * main view's locks, an LFO moving it, or every 32 blocks (23 ms) for anything else */

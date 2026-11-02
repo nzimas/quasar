@@ -1589,6 +1589,7 @@ static int cmd_loopin(const char *dir)
         lop_meta_t m;
         int rc;
         QEXPECT(!pat_save(0) && !pat_save_as_rc(2), "(patterns 1 and 3)");
+        pat_switch(0);                           /* (saved into 3, 3 plays: back to pattern 1) */
         lp_clear_pat(2);
         QEXPECT(!prj_save(6) && lop_bytes() == 1u + 8u + 2u * sizeof(lev_t), "(session 7: one loop, in pattern 1)");
         for (sec = 0; sec < LOP_N; sec++)        /* (its loop as builds 38 .. 72 wrote it: no pattern) */
@@ -1757,8 +1758,8 @@ static int cmd_patsave(void)
     for (t = 0, all = 1; t < NTRACK; t++)
         for (i = 0; i < NSTEP; i++)
             all &= w.note[t][i] == seq_note[t][i];
-    WEXPECT(pat_store[7].used && all && pat_cur == 0u && str_eq(ui.flash_l1, "SAVED"),
-            "a white key held on the grid: the pattern playing saved there, every track");
+    WEXPECT(pat_store[7].used && all && pat_cur == 7u && str_eq(ui.flash_l1, "SAVED"),
+            "a white key held on the grid: the pattern playing saved there, every track, and it plays from now on");
     btn(B_GLO, 0);
     /* the track's view: the root's keys dim, the others dark */
     ui.scale = 2;                                /* (MINOR, root D) */
@@ -1774,6 +1775,36 @@ static int cmd_patsave(void)
             j |= (key_note(k, 0) + 120u - ui.root) % 12u != 0u;
         }
     WEXPECT(all > 0u && !j, "chromatic: the keys dim the root's alone");
+    {   /* saved into another slot, it plays from then on; the one left keeps its own mutes -- stopped and playing */
+        static int32_t out[CTL * 2];
+        uint32_t n, run;
+        for (run = 0; run < 2u; run++) {
+            seq_run = 0;
+            pat_switch(0);
+            memset((void *)trk_mute, 0, NTRACK);
+            trk_mute[1] = 1;
+            pat_save_as(0);                      /* (pattern 1: track 2 muted) */
+            trk_mute[1] = 0;                     /* (track 2 unmuted, then saved as pattern 2) */
+            pat_save_as(1);
+            WEXPECT(pat_cur == 1u && !pat_dirty && !trk_mute[1], "saved into pattern 2: pattern 2 plays, as it was saved");
+            seq_run = (uint8_t)run;
+            pat_switch(0);
+            for (n = 0; n < 4000u && seq_pend; n++) {
+                mix_block(out);
+                pat_poll();
+            }
+            WEXPECT(pat_cur == 0u && trk_mute[1], run ? "playing, back to pattern 1: track 2 muted again, as it was saved"
+                                                      : "stopped, back to pattern 1: track 2 muted again, as it was saved");
+            pat_switch(1);
+            for (n = 0; n < 4000u && seq_pend; n++) {
+                mix_block(out);
+                pat_poll();
+            }
+            WEXPECT(pat_cur == 1u && !trk_mute[1], "and pattern 2: track 2 playing");
+        }
+        seq_run = 0;
+        memset((void *)trk_mute, 0, NTRACK);
+    }
     printf("patsave: %d failures\n", fails);
     return fails != 0;
 }

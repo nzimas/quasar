@@ -72,40 +72,71 @@ static int cmd_bridge(void)
         }
         BCHECK(__builtin_popcount(lens)>=4 && ratch>20 && off>5,"phrases: polymeters, ratchets, hits off the grid");
     }
-    /* the STUTTER's key (the 6th black key): SHIFT and it held, the stutter plays; let go, it stops; held alone 0.8 s,
-     * its page */
+    /* TRANSFORM's key (the 6th black key): SHIFT and it held, on; let go, off; held alone 0.8 s, its page */
     ui.page=PG_MAIN;ui.sv=0;
-    fm1_in.notes|=1u<<KEY_SHIFT; key(KEY_STUT,1); key(KEY_STUT,1); for(i=0;i<20;i++) mix_block(out);
-    BCHECK(stut_ui==1,"SHIFT + the STUTTER key held: it plays");
-    key(KEY_STUT,0); fm1_in.notes&=~(1u<<KEY_SHIFT); key(KEY_STUT,0);
-    BCHECK(stut_ui==0,"let go: it stops");
-    key(KEY_STUT,1); fm1_ms+=900; key(KEY_STUT,1); key(KEY_STUT,0);
-    BCHECK(ui.page==PG_FXP && ui.fx_pg==FXP_STUT && stut_ui==0,"the STUTTER key held alone: its page, and no stutter");
-    {   /* RATE past 100: RND, and back; read as RND */
-        char tb[24];
-        pnl[PN_ST_RATE]=127; fx_turn(1,1);
-        BCHECK(pnl[PN_ST_RATE]==ST_VAL_RND,"RATE turned past 100: RND");
-        fx_text(1,pnl[PN_ST_RATE],tb); BCHECK(!strcmp(tb,"RND"),"RND reads RND");
-        fx_turn(1,-1); BCHECK(pnl[PN_ST_RATE]==127,"turned back from RND: 100");
-        BCHECK(fx_kind(0)==3u && fx_list_n(0)==7u && fx_list_n(2)==5u && fx_kind(3)==9u,"SLICE and MODE end in RND, DECAY too");
+    fm1_in.notes|=1u<<KEY_SHIFT; key(KEY_XF,1); key(KEY_XF,1); for(i=0;i<20;i++) mix_block(out);
+    BCHECK(xf_ui==1 && p23_transform_active(),"SHIFT + TRANSFORM's key held: on");
+    key(KEY_XF,0); fm1_in.notes&=~(1u<<KEY_SHIFT); key(KEY_XF,0); mix_block(out);
+    BCHECK(xf_ui==0 && !p23_transform_active(),"let go: off");
+    key(KEY_XF,1); fm1_ms+=900; key(KEY_XF,1); key(KEY_XF,0);
+    BCHECK(ui.page==PG_FXP && ui.fx_pg==FXP_XF && xf_ui==0,"TRANSFORM's key held alone: its page, and it stays off");
+    {   /* 4 rows, each with RND first (the lists' first entry, the numbers' below 0); at first ALL, 2, 60, 100 */
+        char tb[24]; uint32_t j;
+        BCHECK(fx_n()==4u,"TRANSFORM: 4 rows (no SPACE)");
+        for(j=0;j<4u;j++) { fx_text(j,0,tb); BCHECK(!strcmp(tb,"RND"),"each TRANSFORM row: RND first"); }
+        BCHECK(fx_kind(0)==3u && fx_list_n(0)==6u && fx_list_n(1)==6u && fx_kind(2)==9u && fx_kind(3)==9u,
+               "TRACKS and STACK lists, DEPTH and MIX RND then 0 .. 100");
+        fx_text(0,pnl[PN_XF_TRACKS],tb); BCHECK(!strcmp(tb,"ALL"),"at first: TRACKS ALL");
+        fx_text(1,pnl[PN_XF_STACK],tb); BCHECK(!strcmp(tb,"2"),"at first: STACK 2");
+        fx_text(2,pnl[PN_XF_DEPTH],tb); BCHECK(!strcmp(tb,"60"),"at first: DEPTH 60");
+        fx_text(3,pnl[PN_XF_MIX],tb); BCHECK(!strcmp(tb,"100"),"at first: MIX 100");
+        pnl[PN_XF_DEPTH]=1; fx_turn(2,-1); BCHECK(pnl[PN_XF_DEPTH]==0,"DEPTH turned below 0: RND");
+        fx_turn(2,1); fx_text(2,pnl[PN_XF_DEPTH],tb); BCHECK(!strcmp(tb,"0"),"and back up: 0");
+        pnl[PN_XF_DEPTH]=101; fx_turn(2,5); BCHECK(pnl[PN_XF_DEPTH]==101,"DEPTH stops at 100");
+        pnl[PN_XF_DEPTH]=PNL0[PN_XF_DEPTH];
     }
     ui.page=PG_MAIN;
-    {   /* the STUTTER's RND rows: each press draws its own SLICE, RATE, MODE and DECAY, in their ranges */
-        uint32_t n,slices=0,rates=0,bad=0;
-        pnl[PN_ST_SLICE]=ST_SLC_RND; pnl[PN_ST_RATE]=ST_VAL_RND; pnl[PN_ST_MODE]=ST_MODE_RND; pnl[PN_ST_DECAY]=ST_VAL_RND;
-        for(n=0;n<16u;n++) {
-            fm1_ms+=37; fm1_in.notes|=1u<<KEY_SHIFT; key(KEY_STUT,1); key(KEY_STUT,1);
-            if(stut_pick[0]>=6u || stut_pick[1]>=128u || stut_pick[2]>=4u || stut_pick[3]>=128u || !stut_ui) bad++;
-            slices|=1u<<stut_pick[0]; rates|=1u<<(stut_pick[1]>>4);
-            key(KEY_STUT,0); fm1_in.notes&=~(1u<<KEY_SHIFT); key(KEY_STUT,0);
+    {   /* at first: every track, 2 effects, DEPTH 60 (76), MIX 100 (127); RND: each press its own draw, within what
+         * is heard, the tracks with notes first; set rows kept */
+        uint32_t n,bad=0,masks=0,stacks=0,t;
+        fm1_in.notes|=1u<<KEY_SHIFT; key(KEY_XF,1); key(KEY_XF,1);
+        BCHECK(xf_now.tracks==63u && xf_now.stack==2u && xf_now.depth==76u && xf_now.mix==127u,"at first: as the rows read");
+        key(KEY_XF,0); fm1_in.notes&=~(1u<<KEY_SHIFT); key(KEY_XF,0);
+        for(t=0;t<NTRACK;t++) memset((void *)seq_note[t],0,NSTEP);
+        seq_note[1][0]=60; seq_note[3][4]=60;
+        pnl[PN_XF_TRACKS]=pnl[PN_XF_STACK]=pnl[PN_XF_DEPTH]=pnl[PN_XF_MIX]=0;
+        for(n=0;n<40u;n++) {
+            uint32_t c;
+            fm1_ms+=37; fm1_in.notes|=1u<<KEY_SHIFT; key(KEY_XF,1); key(KEY_XF,1);
+            c=(uint32_t)__builtin_popcount(xf_now.tracks);
+            if(c<2u || c>6u || (xf_now.tracks&10u)!=10u || xf_now.stack<2u || xf_now.stack>4u || xf_now.depth<31u
+               || xf_now.mix<63u || !xf_ui) bad++;
+            masks|=1u<<(xf_now.tracks&31u); stacks|=1u<<xf_now.stack;
+            key(KEY_XF,0); fm1_in.notes&=~(1u<<KEY_SHIFT); key(KEY_XF,0);
         }
-        BCHECK(!bad,"RND: every press plays, its values in range");
-        BCHECK(__builtin_popcount(slices)>=3 && __builtin_popcount(rates)>=4,"RND: the presses differ");
-        memcpy(pnl+PN_ST_SLICE,PNL0+PN_ST_SLICE,NPN-PN_ST_SLICE);
+        BCHECK(!bad,"RND: every press on, its values in range, the tracks with notes in it");
+        BCHECK(__builtin_popcount(masks)>=4 && __builtin_popcount(stacks)>=3,"RND: the presses differ");
+        pnl[PN_XF_TRACKS]=1; pnl[PN_XF_STACK]=5; pnl[PN_XF_DEPTH]=101; pnl[PN_XF_MIX]=1;
+        fm1_in.notes|=1u<<KEY_SHIFT; key(KEY_XF,1); key(KEY_XF,1);
+        BCHECK(xf_now.tracks==10u && xf_now.stack==5u && xf_now.depth==127u && xf_now.mix==0u,
+               "set rows: as set (TRACKS 2: those with notes)");
+        key(KEY_XF,0); fm1_in.notes&=~(1u<<KEY_SHIFT); key(KEY_XF,0);
+        memcpy(pnl+PN_XF_TRACKS,PNL0+PN_XF_TRACKS,PN_CTRL_ALL-PN_XF_TRACKS);
+        seq_note[1][0]=0; seq_note[3][4]=0;
     }
-    /* the STUTTER and PERFORMANCE keys lit dimly in the track view */
+    {   /* a session saved before this TRANSFORM (the STUTTER's bytes, or the first TRANSFORM's): its defaults, CTRL
+         * ALL kept */
+        uint8_t old[NPNL]; p23_cable none[NPCAB];
+        memcpy(old,pnl,NPNL); memset(none,0,sizeof none);
+        old[PN_XF_TRACKS]=0; old[PN_XF_DEPTH]=0; old[PN_XF_MARK]=0x5Au; old[PN_CTRL_ALL]=1; old[NPNL-1u]=PNL_MARK;
+        pnl_give(old,none);
+        BCHECK(pnl[PN_XF_TRACKS]==5u && pnl[PN_XF_DEPTH]==61u && pnl[PN_XF_MARK]==XF_MARK && pnl[PN_CTRL_ALL]==1,
+               "an older session: TRANSFORM at its defaults, CTRL ALL kept");
+        pnl[PN_CTRL_ALL]=0;
+    }
+    /* TRANSFORM's and PERFORMANCE's keys lit dimly in the track view */
     ui.page=PG_MAIN; ui.sv=0; ui_leds();
-    BCHECK(host_dim_on(14u+KEY_STUT) && host_dim_on(14u+KEY_PERF),"the STUTTER and PERFORMANCE keys dim in the track view");
+    BCHECK(host_dim_on(14u+KEY_XF) && host_dim_on(14u+KEY_PERF),"TRANSFORM's and PERFORMANCE's keys dim in the track view");
     {   /* PERFORMANCE (the 7th black key): the macros of every track with notes move together; off, everything as
          * it was -- sounds, steps, level, panel, mutes, and nothing marked changed */
         int16_t m0,m2,m4; int8_t lv=ui.level[0]; uint32_t q; uint8_t fxm=pnl[PN_FX_MODE],pc=pat_cur;
@@ -184,7 +215,7 @@ static int cmd_levels(void)
 static int cmd_native_screens(const char *dir)
 {
     uint32_t m;char name[32],path[256];
-    static const char *const PG[FXP_PATCH+1]={"clock","looper","shaos","lfo","fx","mix","stutter_slot","cv","patch"};
+    static const char *const PG[FXP_PATCH+1]={"clock","looper","shaos","lfo","fx","mix","transform","cv","patch"};
     tracks_init();ui_init();fm1_ms=5000;
     splash_draw("BUILD 3");snprintf(path,sizeof path,"%s/native_splash.ppm",dir);ppm(path);
     for(m=0;m<NTRACK;m++) {   /* the track view, each track of the start's kit */
@@ -211,9 +242,6 @@ static int cmd_native_screens(const char *dir)
         snprintf(name,sizeof name,"panel_%s",PG[m]);shot(dir,name);
     }
     ui.fx_pg=FXP_FX;ui.half=1;ui.force=1;shot(dir,"panel_fx_eh");
-    ui.fx_pg=FXP_STUT;ui.half=0;ui.force=1;shot(dir,"panel_stutter");ui.half=1;ui.force=1;shot(dir,"panel_stutter_eh");ui.half=0;
-    pnl[PN_ST_SLICE]=ST_SLC_RND;pnl[PN_ST_RATE]=ST_VAL_RND;pnl[PN_ST_MODE]=ST_MODE_RND;pnl[PN_ST_DECAY]=ST_VAL_RND;
-    ui.force=1;shot(dir,"panel_stutter_rnd");memcpy(pnl+PN_ST_SLICE,PNL0+PN_ST_SLICE,NPN-PN_ST_SLICE);
     ui.page=PG_MAIN;perf_on=1;ui.force=1;shot(dir,"native_track_view_perf");perf_on=0;ui.page=PG_FXP;
     ui.fx_pg=FXP_CMP;ui.half=0;shot(dir,"native_duck");
     return 0;
@@ -228,7 +256,7 @@ static void wav_write(const char *path,const int16_t *pcm,uint32_t frames)
     v=4u|16u<<16; fwrite(&v,4,1,f); fwrite("data",1,4,f); fwrite(&bytes,4,1,f); fwrite(pcm,2,frames*2u,f); fclose(f);
 }
 /* the website's demos: a kit of six profiles, a phrase drawn on each track, eight bars through the whole frontend and
- * engine (the firmware's own code, on the computer), the STUTTER thrown in on the last beat of bars 5 and 9; ten bars,
+ * engine (the firmware's own code, on the computer), TRANSFORM thrown in on the last beat of bars 5 and 9; ten bars,
  * so that tools/make_loop.py takes eight from the second on (the effects' tails in, and a bar after to fade into) */
 static int cmd_demo(const char *dir)
 {
@@ -252,13 +280,14 @@ static int cmd_demo(const char *dir)
         nb=(uint32_t)(44100u*60u*4u*10u/D[d].bpm)/CTL;
         for(b=0,frames=0;b<nb;b++) {
             uint32_t bar=b*CTL/(44100u*60u*4u/D[d].bpm), beat=b*CTL/(44100u*60u/D[d].bpm)%4u;
-            stut_ui=(uint8_t)((bar==4u || bar==8u) && beat==3u);
+            if(!xf_ui && (bar==4u || bar==8u) && beat==3u) xf_draw(63u,next_seed(),&xf_now);
+            xf_ui=(uint8_t)((bar==4u || bar==8u) && beat==3u);
             if(!(b%32u)) ui_publish();
             mix_block(out);
             for(i=0;i<CTL*2u;i++) pcm[frames*2u+i]=(int16_t)clampi(out[i],-32767,32767);
             frames+=CTL;
         }
-        stut_ui=0; seq_run=0;
+        xf_ui=0; seq_run=0;
         snprintf(path,sizeof path,"%s/%s.wav",dir,D[d].name);
         wav_write(path,pcm,frames);
         printf("demo: %s %u BPM, %u frames (%.3f s)\n",path,D[d].bpm,frames,frames/44100.0);

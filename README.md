@@ -12,7 +12,7 @@ A firmware for the M-VAVE FM-1, for experimental IDM, after the SOMA Pulsar-23.
 Quasar models the Pulsar-23 as a whole instrument -- its BD, BASS, SD and HHT circuits, its SHAOS shift register,
 LFO, clock and dividers, FX processor and distortion -- with an audio engine written from scratch for the FM-1's chip,
 aimed at experimental IDM. 6 tracks, 16 engine profiles, 147 sound families, macros and internal routes, WRECK, a
-stutter, a phrase generator with polymeters, 10 BREAK ways and a PERFORMANCE mode.
+TRANSFORM, a phrase generator with polymeters, 10 BREAK ways and a PERFORMANCE mode.
 
 Website, browser installer and manual: <https://nzimas.github.io/quasar/>.
 
@@ -48,7 +48,7 @@ From the command line (macOS or Linux): `./setup.sh` once, then `./install.sh` (
 | black key 3 | **held**: [BREAK](#break) on the chosen track. **SHIFT +**: on every track. |
 | black key 4 | [MIDI LEARN](#midi-learn) on or off. |
 | black key 5 | chosen track's [arpeggiator](#arpeggiator) on or off. **Held** (0.8 s): its page. |
-| black key 6 | **SHIFT +** it **held**: the [STUTTER](#stutter) plays. **Held** alone (0.8 s): STUTTER page. |
+| black key 6 | **SHIFT +** it **held**: [TRANSFORM](#transform) on. **Held** alone (0.8 s): TRANSFORM page. |
 | black key 7 | [PERFORMANCE](#performance) on or off. In the step view: **SHIFT +** it. |
 | black key 9 (3rd from right) | **STEP**: [step view](#step-view). **SHIFT +**: empty the chosen track's steps. |
 | black key 10 | **EDIT**: [sound pages](#sound-pages-edit). |
@@ -66,7 +66,7 @@ From the command line (macOS or Linux): `./setup.sh` once, then `./install.sh` (
 | **SEQ** | [panel pages](#effects-seq), then the chosen track's DUCK and [automation LFOs](#automation-lfos), in turn. |
 | **SHIFT + SEQ** | chosen track's automation LFOs drawn anew. |
 | **SAVE** | [PATTERNS](#patterns) grid; SAVE again leaves it. |
-| **SAVE held** (0.8 s) | save the session. On the PATTERNS grid: save the pattern playing into the slot under the cursor. |
+| **SAVE held** (0.8 s) | save the session. On the PATTERNS grid: save the pattern playing into the slot under the cursor, which then plays. |
 | **SHIFT + SAVE** | [SESSIONS](#sessions) grid; SHIFT + SAVE again leaves it. |
 | **SHIFT + SAVE held** (0.8 s) | [GLOBAL SETUP](#global-setup): START and MIDI. |
 | **MASTER** | output level. |
@@ -359,14 +359,14 @@ about every other bar, never the same way 2 times running. The break starts on t
 
 The layers, each drawn at random (at least 1): ratchets (up to 8, faster the longer the key is held), octave leaps
 on melodic tracks, flams on drums, accents (full on the beat, softer between), **RISE** (hits climbing in pitch
-through each half bar), **WRECK** (single hits folded, crushed, bit-reduced or rung), **STUT** (the
-[STUTTER](#stutter) thrown in for a beat or so, with its own slice, speed and roll) and **GHOST** (soft hits on empty
+through each half bar), **WRECK** (single hits folded, crushed, bit-reduced or rung), **XFM**
+([TRANSFORM](#transform) thrown in for a beat or so, as its page sets it, over the tracks under the break) and **GHOST** (soft hits on empty
 steps). A kick keeps the bar's 1st step, takes few ratchets and no leaps, rises or ghosts. Nothing drops out. Loops
 play on as recorded.
 
 **Saving a break.** On the PATTERNS grid, with black key 3 held and the sequencer playing, hold a white key 0.8 s: the
 break, as it plays, is saved into that pattern slot (BREAK SAVED, PATTERN n). It keeps the way, ratchets, octave
-leaps, flams, accents and RISE; not WRECK, STUT or GHOST. The pattern playing goes on.
+leaps, flams, accents and RISE; not WRECK, XFM or GHOST. The pattern playing goes on.
 
 ## Effects (SEQ)
 
@@ -400,31 +400,34 @@ On the DUCK page, **SC SOURCE** chooses whose hits duck the chosen track (OFF, o
 0 to 100. The duck follows the source sound's envelope: it lets go as the source's hit dies away. The track's FX send
 ducks with it. Both are saved with the pattern.
 
-### STUTTER
+### TRANSFORM
 
-A beat repeat of the whole output, on its own (not through the FX). **Hold SHIFT and black key 6** (in either order; the step view
-off): it takes the slice just heard (on the next 32nd while the sequencer plays, at once while it is stopped) and plays
-it round and round in place of the mix until either key is let go. The music carries on underneath, and comes back as
-the keys are let go. STUTTER shows while it plays.
+Changes how tracks sound, never when they play: a stack of the firmware's own effects over 2 to 6 tracks. **Hold
+SHIFT and black key 6** (in either order; the step view off): TRANSFORM is on until either key is let go, and
+TRANSFORM shows on the screen. Each press draws a new stack. It is meant for playing live; [BREAK](#break) is the one
+that rearranges the steps.
 
-**Hold black key 6 alone** (0.8 s) to open or close the STUTTER page (key lit while it plays or the page is up):
+**Hold black key 6 alone** (0.8 s) to open or close the TRANSFORM page (key lit while it is on or the page is up):
 
-![STUTTER page](docs/assets/screens/panel_stutter.png)
+![TRANSFORM page](docs/assets/screens/panel_transform.png)
 
-| Row | What it sets | At first |
-| --- | --- | --- |
-| SLICE | 1/32, 1/16, 1/8, 1/4, 1/16T, 1/8T of the tempo, or RND | 1/16 |
-| RATE | 50 as heard; lower slower and darker, higher faster; past 100, RND | 50 |
-| MODE | FWD, REV, ALT (turning each pass), WILD (each pass its own way and speed), RND | FWD |
-| DECAY | each pass quieter; past 100, RND | 0 |
-| DRIFT | each pass slower below 50, faster above | 50 |
-| ROLL | the slice halving every few passes, faster as it rises | 0 |
-| MIX | how much of it over the music | 100 |
+| Row | What it sets | At first | RND draws |
+| --- | --- | --- | --- |
+| TRACKS | RND, 2, 3, 4, 5 or ALL: how many tracks. Tracks with notes are taken first, then others | ALL | 2–6 |
+| STACK | RND, 1–5: how many of DRIVE, FOLD, RING, CRUSH and BITS, picked at random each press | 2 | 2–4 |
+| DEPTH | RND, 0–100: how hard each effect is set | 60 | 25–100 |
+| MIX | RND, 0–100: how much of the stack replaces the tracks' sound | 100 | 50–100 |
 
-A row set to RND draws a new value each time SHIFT and the key are pressed (any slice, rate, mode, WILD among them, or
-decay), so every press is different. The STUTTER page's settings are kept with the session.
+RND is the first value of each row: turn a number below 0, or a list back to its start. A row on RND draws a new
+value at each press, in the range above, kept narrow enough that the change is heard. The settings are kept with the
+session; a session saved before this build starts with the values above.
 
-![STUTTER, every row on RND](docs/assets/screens/panel_stutter_rnd.png)
+The effects come after each voice's own WRECK and fade in and out over a few milliseconds: **DRIVE** soft-clips at
+4–20× gain, **FOLD** folds at 2–7×, **RING** ring-modulates with a triangle at 30 Hz–3 kHz, **CRUSH** holds each sample
+for 3–15 samples, **BITS** keeps 2 or 3 bits. DEPTH sets each within its range, with some spread per press.
+
+TRANSFORM leaves the delay and reverb as the FX page sets them. (An earlier version could also send the tracks into
+them, in time with the tempo; on the FM-1 that dragged the sequencer, so it was taken out.)
 
 ### Automation LFOs
 
@@ -456,7 +459,7 @@ Elektron's temporary edits and CONTROL ALL. The key is lit while it is on, and P
 ![PERFORMANCE on](docs/assets/screens/native_track_view_perf.png)
 
 Turned on, it keeps the state playing: every track's sound, the steps and their locks, lengths, clocks and
-directions, levels, pans, mutes, octaves, chords, arpeggiators, sidechains, the panel and STUTTER pages, tempo, scale
+directions, levels, pans, mutes, octaves, chords, arpeggiators, sidechains, the panel and TRANSFORM pages, tempo, scale
 and MUTE QT. Change anything: sounds, EDIT pages, phrases, steps, breaks. Turned off, all of it is put back as it was
 (RESTORED), and nothing is left marked unsaved. Sounds still ringing are not cut; they and the FX tails ring out.
 Loops are not part of it: a loop recorded or emptied meanwhile stays so. With a pattern on its way, it does not turn
@@ -595,7 +598,7 @@ it. The tempo is also a row of the session's page.
 
 A session has 16 patterns. A pattern holds every track's steps (with their length, clock, direction, transposition,
 DENSITY and COMPLEXITY), its loops, and each track's mute, circuit, octave, level, pan, sidechain, CHORD mode and
-arpeggiator. The sounds, the panel and STUTTER pages, the tempo, the scale and the root belong to the session.
+arpeggiator. The sounds, the panel and TRANSFORM pages, the tempo, the scale and the root belong to the session.
 
 **SAVE** opens the PATTERNS grid; SAVE again leaves it. The white keys are the 16 patterns, the one playing brighter.
 On the screen the pattern playing is green (orange with changes not saved), saved patterns white, empty ones grey, and
@@ -604,14 +607,14 @@ the white square is the cursor: it opens on the pattern playing, and **PRESETS**
 | To | Do this |
 | --- | --- |
 | Play a pattern | press and release its white key. While the sequencer plays, it starts at the end of the chosen track's steps |
-| Save the pattern playing into a slot | hold the slot's white key 0.8 s, or move the cursor there and hold SAVE; the slot may be empty or not, and the pattern playing goes on |
+| Save the pattern playing into a slot | hold the slot's white key 0.8 s, or move the cursor there and hold SAVE; the slot may be empty or not. That slot is then the pattern playing, without a break in the music; the pattern you saved from keeps what it held before, its mutes included |
 | Save its changes in its own slot | hold its own white key 0.8 s |
 | Copy a pattern | SHIFT + hold its key 0.8 s |
 | Paste it | SHIFT + hold another key 0.8 s |
 | Empty a pattern | hold SHIFT and black key 1, and press its key |
 | Leave the grid | SAVE, or a track button |
 
-A changed pattern keeps its changes when you switch away, until the session is saved or loaded. A pattern that
+A changed pattern keeps its changes when you switch away, until the session is saved or loaded (unless you saved them into another slot: they went there). A pattern that
 unmutes a track starts that track cleanly, without notes left over from the muted time. Every note is always saved;
 on a pattern crowded with locks, the last locks may be left out. MUTE mode (black key 2), BREAK (black key 3) and
 PERFORMANCE (black key 7) work on the grid too, and MIDI program changes 0 to 15 choose patterns 1 to 16
@@ -622,7 +625,7 @@ A pattern keeps each track's circuit, not its mode: the mode is the session's so
 ## Sessions
 
 16 sessions are kept in the FM-1's flash. A session holds everything: every track's sounds and settings, the panel and
-STUTTER pages, CTRL, the tempo, the scale and root, MUTE QT, the 16 patterns with their loops, and the pattern playing.
+TRANSFORM pages, CTRL, the tempo, the scale and root, MUTE QT, the 16 patterns with their loops, and the pattern playing.
 
 ![SESSIONS grid](docs/assets/screens/sessions_grid.png)
 

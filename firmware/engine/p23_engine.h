@@ -154,21 +154,19 @@ void p23_lr_clear(uint32_t channel);
 void p23_clock_reset(void);                  /* RST: dividers and LR to the loop start */
 void p23_click(int accent);
 void p23_set_master(uint16_t gain4096);
-/* The STUTTER: a beat repeat of the whole output, apart from the FX (its own 0.74 s of memory). Held, it takes the
- * slice just heard (on the next 32nd while the clock runs) and plays it round and round in place of the mix */
+/* TRANSFORM: a stack of the engine's own effects over some tracks, while held. It changes how they sound, never
+ * when they play. At each hold the stack is drawn afresh (from seed): STACK of DRIVE, FOLD, RING, CRUSH and BITS,
+ * each set by DEPTH, in a stage of its own after each voice's WRECK, crossfaded in by MIX. */
 typedef struct {
-    uint8_t slice;   /* 0 .. 5: 1/32, 1/16, 1/8, 1/4, 1/16 triplet, 1/8 triplet of the tempo */
-    uint8_t rate;    /* 0 .. 127: its speed, 64 as heard (a quarter .. four times) */
-    uint8_t mode;    /* P23_ST_*: forward, reversed, turning each pass, or each pass its own way and speed */
-    uint8_t decay;   /* 0 .. 127: each pass quieter */
-    uint8_t drift;   /* 0 .. 127: each pass slower (below 64) or faster (above) */
-    uint8_t roll;    /* 0 .. 127: the slice halves every so many passes, faster as it rises (0: never) */
-    uint8_t mix;     /* 0 .. 127: how far the repeat replaces the mix */
-} p23_stutter;
-enum { P23_ST_FWD, P23_ST_REV, P23_ST_ALT, P23_ST_RND };
-void p23_set_stutter(const p23_stutter *s);
-void p23_stutter_hold(int on);
-int p23_stutter_active(void);
+    uint8_t tracks;    /* bit t: track t's voices transformed */
+    uint8_t stack;     /* 1 .. 5 effects */
+    uint8_t depth;     /* 0 .. 127: how hard each effect is set */
+    uint8_t mix;       /* 0 .. 127: how far the stack replaces each voice */
+    uint32_t seed;     /* the stack drawn from it at each hold */
+} p23_transform;
+void p23_set_transform(const p23_transform *x);
+void p23_transform_hold(int on);
+int p23_transform_active(void);
 void p23_copy_usb(int32_t stereo[P23_BLOCK*2]);
 /* Advances every circuit, including oscillators whose VCA is closed. */
 void p23_process(int32_t stereo[P23_BLOCK*2]);

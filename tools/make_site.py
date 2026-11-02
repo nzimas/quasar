@@ -215,7 +215,7 @@ def fragments():
         "written from scratch."))
     (DOCS / "screens.html").write_text(page(
         "Quasar on the FM-1's screen", "Screens", (src / "screens.html").read_text(),
-        "Quasar on the M-VAVE FM-1's screen: the track view, the sound's pages, STUTTER, PERFORMANCE and the sessions."))
+        "Quasar on the M-VAVE FM-1's screen: the track view, the sound's pages, TRANSFORM, PERFORMANCE and the sessions."))
     (DOCS / "install.html").write_text(page(
         "Install Quasar", "Install", (src / "install.html").read_text(),
         "Install Quasar on an M-VAVE FM-1 from your browser, over USB MIDI.",
@@ -288,7 +288,7 @@ CONTROLS = [
                           "grid, with a white key held 0.8 s: save the break. In the step view: TRIG."),
     ([27], "black key 4", '<a href="#midi-learn">MIDI LEARN</a>. In the step view: MOD.'),
     ([28], "black key 5", '<a href="#arpeggiator">Arpeggiator</a>; <b>held</b> (0.8 s), its page.'),
-    ([29], "black key 6", '<b>SHIFT +</b> it held: the <a href="#stutter">STUTTER</a>; <b>held</b> alone (0.8 s), its '
+    ([29], "black key 6", '<b>SHIFT +</b> it held: <a href="#transform">TRANSFORM</a>; <b>held</b> alone (0.8 s), its '
                           "page. In the step view: direction REVERSE."),
     ([30], "black key 7", '<a href="#performance">PERFORMANCE</a> on or off (also on the PATTERNS grid). In the step '
                           "view: direction PING-PONG; <b>SHIFT +</b>, PERFORMANCE."),
@@ -307,7 +307,7 @@ KNOB_PAGES = [
     ("SHIFT held", "DRIVE", "FX send", "ATTACK", "macro 8"),
     ('<a href="#sound-pages-edit">EDIT</a>', "row A (E)", "row B (F)", "row C (G)", "row D (H)"),
     ('<a href="#effects-seq">SEQ</a>', "row A (E)", "row B (F)", "row C (G)", "row D (H)"),
-    ('<a href="#stutter">STUTTER</a> page', "SLICE (DRIFT)", "RATE (ROLL)", "MODE (MIX)", "DECAY"),
+    ('<a href="#transform">TRANSFORM</a> page', "TRACKS", "STACK", "DEPTH", "MIX"),
     ('<a href="#arpeggiator">ARP</a> page', "MODE (LATCH)", "RATE (DENSITY)", "RANGE (OCT RND)", "GATE (BASS)"),
     ('a step held, <a href="#step-view">step view</a>', "macro 1", "macro 2", "macro 3", "macro 4"),
     ('a step held, <a href="#step-pages">TRIG</a> on', "note (RATCHET)", "velocity", "length", "condition"),

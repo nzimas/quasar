@@ -57,10 +57,10 @@
 #define PE_OWN_OUT 254u
 #define PE_OWN_ENV 253u
 #define PE_LIVE 252u
-#define PE_ST_LEN 32768u           /* the stutter's memory: 0.74 s of the output, mono */
 #define PE_FX_QUIET 6200u          /* blocks (4.5 s) of FX silence, beyond its longest repeat, before it rests */
 
 enum { PF_DRV=1, PF_LST=2, PF_STRONG=4 };
+enum { XF_DRIVE=1, XF_FOLD=2, XF_RING=4, XF_CRUSH=8, XF_BITS=16 };   /* (TRANSFORM's effects, in their order) */
 /* the utility circuits with a pin patched (pe.util): only those are computed */
 enum { PU_VCA1=1, PU_VCA2=2, PU_INV=4, PU_CINV=8, PU_SW1=16, PU_SW2=32, PU_ATT=64, PU_IMP=128, PU_DIODE=256,
        PU_CAP=512, PU_SRC=1024, PU_SHAOS=2048, PU_LFO=4096 };
@@ -94,6 +94,10 @@ typedef struct {
     int32_t d_lp,d_post,d_sag,d_g,d_comp,d_pole,d_emph,d_mix;
     int32_t np,rd,pk;
     pe_coef fc,rc[3];
+    /* TRANSFORM's stage: its mix (the block's start, end), ring phase, crush hold */
+    int32_t xm0,xm,xhold;
+    uint32_t xph;
+    uint8_t xcnt;
 } pe_node;
 typedef struct {
     uint32_t pos,target,since,period;
@@ -147,12 +151,12 @@ static struct {
     /* what the routes read, as it was through the last block (written by the sample loop, read by the voices) */
     int32_t rec[PE_RSRC][P23_BLOCK];
     int16_t ks[P23_NODES][PE_KS_LEN];
-    /* the stutter: its memory, where it writes, the slice held and how it plays */
-    int16_t st_buf[PE_ST_LEN];
-    p23_stutter st;
-    uint32_t st_w,st_cap,st_len,st_pos,st_rate,st_loops,st_rnd;
-    int32_t st_gain,st_xf;
-    uint8_t st_hold,st_on,st_dir;
+    /* TRANSFORM: its settings, held or not, the stack drawn at the hold (each effect's draw xf_u, the ring's
+     * frequency's), and what they set this block */
+    p23_transform xf;
+    uint32_t xf_rnd,xf_inc;
+    int32_t xf_gd,xf_gf,xf_ring,xf_mask,xf_half;
+    uint8_t xf_hold,xf_on,xf_set,xf_every,xf_u[6];
 } pe PE_MEMORY;
 
 static void pe_zero(void *memory,uint32_t count)
@@ -160,7 +164,7 @@ static void pe_zero(void *memory,uint32_t count)
 PM_INLINE int32_t pe_volts(uint32_t v127) { return (int32_t)v127*258; }
 /* one-pole followers with 8 extra bits of state, so slow corners do not stall on rounding */
 PM_INLINE int32_t pe_lp(int32_t *s256,int32_t x,int32_t k)
-{ *s256+=(int32_t)(((int64_t)(x*256-*s256)*k)>>15); return *s256/256; }
+{ *s256+=(int32_t)(((int64_t)(x*256-*s256)*k)>>15); return pm_sdiv(*s256,8); }
 PM_INLINE int32_t pe_hp(int32_t *s256,int32_t x,int32_t k) { return x-pe_lp(s256,x,k); }
 
 /* ---------------------------------------------------------------- pins --- */
@@ -197,7 +201,7 @@ PM_INLINE int32_t pe_in(uint32_t pin)
 {
     uint32_t n=pe.net_of[pin]; int32_t w,s,v;
     if(n>=PE_NETS) return 0;
-    if(pe.net_lp[n]) return pe.net_lpv[n]/256;
+    if(pe.net_lp[n]) return pm_sdiv(pe.net_lpv[n],8);
     w=pe.net_w[n]-pe.seen_w[pin];
     if(w<=0) return 0;
     s=pe.net_s[n]-(int32_t)pe.seen_w[pin]*pe.seen_v[pin];
@@ -279,7 +283,7 @@ int32_t p23_pin_value(uint32_t pin)
     uint32_t n;
     if(pin==P23_PIN_NONE || pin>=P23_PINS) return 0;
     n=pe.net_of[pin];
-    if(n<PE_NETS && pe.net_w[n]>0) return pe.net_lp[n]?pe.net_lpv[n]/256:pe.net_s[n]/pe.net_w[n];
+    if(n<PE_NETS && pe.net_w[n]>0) return pe.net_lp[n]?pm_sdiv(pe.net_lpv[n],8):pe.net_s[n]/pe.net_w[n];
     return (pe.flags[pin]&PF_DRV)?pe.drive[pin]:0;
 }
 
@@ -290,7 +294,7 @@ PM_INLINE void pe_noise(void)
     pe.white=w;
     if(!pe.pink_on) return;
     /* pink-ish: three leaky integrators spaced about two octaves apart, as an analog shaping network */
-    pe.pink[0]+=(w-pe.pink[0])/512;
+    pe.pink[0]+=pm_sdiv(w-pe.pink[0],9);
     pe.pink[1]+=(w-pe.pink[1])/48;
     pe.pink[2]+=(w-pe.pink[2])/5;
     pe.pink_out=pm_bound((pe.pink[0]*7+pe.pink[1]*3+pe.pink[2]*2)/3,-PE_V5,PE_V5);
@@ -648,7 +652,7 @@ PM_INLINE uint32_t pe_trk_pin(const pe_node *n,uint32_t k) { return P23_PIN_T(n-
 PM_INLINE int32_t pe_src(uint32_t pin)
 {
     uint32_t n=pe.net_of[pin];
-    if(n<PE_NETS && pe.net_w[n]>0) return pe.net_lp[n]?pe.net_lpv[n]/256:pe.net_w[n]==1?pe.net_s[n]:pe.net_s[n]/pe.net_w[n];
+    if(n<PE_NETS && pe.net_w[n]>0) return pe.net_lp[n]?pm_sdiv(pe.net_lpv[n],8):pe.net_w[n]==1?pe.net_s[n]:pe.net_s[n]/pe.net_w[n];
     return pe.drive[pin];
 }
 /* the sound's routes, once a sample: each source x depth / 127 into its destination (P23_RD_*). Sources are
@@ -740,7 +744,7 @@ static PE_FAST int32_t pe_skin(pe_node *n,int32_t ext)
     if(pe_patched(n,P23_T_MOD3)) n->res[0].band+=pm_product(pe_bend(n,P23_T_MOD3),300);
     y=n->res[0].band+n->res[1].band;
     if(n->amp) { y+=pm_product(pe_lcg(n),n->amp); n->amp-=n->amp>>6; if(n->amp<64) n->amp=0; }
-    return pm_soft(pm_product(y,32768+head*300))/2;
+    return pm_sdiv(pm_soft(pm_product(y,32768+head*300)),1);
 }
 /* a triangle fold: x reflected back within +/- 10 V however far it is driven */
 PM_INLINE int32_t pe_fold(int32_t x)
@@ -772,8 +776,8 @@ static PE_FAST int32_t pe_hammer(pe_node *n,int32_t ext)
     n->nlp+=pm_product(r-n->nlp,600);
     n->amp-=n->amp>>(k[P23_BD_STAB]?11:8);
     x+=pm_product(n->nlp*6,n->amp)+(n->punch>PE_V10*7/8?pm_product(r,n->punch):0);
-    x=x>0?pm_soft(x*3/2):pm_soft(x*2)*3/4;
-    return x*3/4;
+    x=x>0?pm_soft(pm_sdiv(x*3,1)):pm_sdiv(pm_soft(x*2)*3,2);
+    return pm_sdiv(x*3,2);
 }
 /* BASS GRIND: an oscillator whose phase its own overdriven filter pushes (SHAPE: the feedback), ring-modulated by
  * noise (WARP), hard-clipped into the resonant LPF: screams, grinding, howl */
@@ -839,7 +843,7 @@ static PE_FAST int32_t pe_fm(pe_node *n,int32_t pm)
     n->ph[0]+=n->minc[0];
     m=pm_sine(n->ph[0]);
     n->phase+=n->inc;
-    return pm_sine(n->phase+((uint32_t)pm<<18)+((uint32_t)pm_product(m,pm_product(n->amp,n->patch.knob[P23_BASS_WARP]*258))<<17))/2;
+    return pm_sdiv(pm_sine(n->phase+((uint32_t)pm<<18)+((uint32_t)pm_product(m,pm_product(n->amp,n->patch.knob[P23_BASS_WARP]*258))<<17)),1);
 }
 /* SD TONE: two body modes (x 1, x 1.47) struck with a short downward bend, beside the noise */
 PM_INLINE int32_t pe_sd_tone(pe_node *n)
@@ -901,7 +905,7 @@ static PE_FAST int32_t pe_bd(pe_node *n,int32_t ext)
     x=n->tri+ext*2;
     /* DRIVE: gain 0.5 .. 24 into a soft knee (triangle .. sine .. square), level kept */
     x=pm_soft((int32_t)(((int64_t)x*n->drive)>>8));
-    return pm_product(x,n->rd)/2;
+    return pm_sdiv(pm_product(x,n->rd),1);
 }
 
 /* BASS: a recursive DCO (feedback phase modulation: sine, toward saw; then toward square), phase MOD,
@@ -938,7 +942,7 @@ static PE_FAST int32_t pe_bass(pe_node *n,int32_t ext,int32_t white)
         }
         sum=pm_product(sum,n->np);                 /* (the array's level, whatever SHAPE mixes in) */
         n->y1=pm_soft(sum);
-        x=pm_soft(pm_product(sum/2,32768+warp*900));
+        x=pm_soft(pm_product(pm_sdiv(sum,1),32768+warp*900));
         if(pm) x=pm_product(x,PE_V10-pm_bound(pm,0,PE_V10));
     } else {
         int32_t beta,fbk,y;
@@ -947,7 +951,7 @@ static PE_FAST int32_t pe_bass(pe_node *n,int32_t ext,int32_t white)
         ph=n->phase+((uint32_t)pm<<18);
         /* the recursion: y = sin(phase + beta * mean of the last two outputs) */
         beta=shape<64?shape*400:25600;
-        fbk=pm_product((n->y1+n->y2)/2,beta);
+        fbk=pm_product(pm_sdiv(n->y1+n->y2,1),beta);
         y=pm_sine(ph+((uint32_t)fbk<<16));
         n->y2=n->y1; n->y1=y;
         if(shape<=64) x=y;
@@ -955,7 +959,7 @@ static PE_FAST int32_t pe_bass(pe_node *n,int32_t ext,int32_t white)
             int32_t sq=(ph<0x80000000u?32767:-32767)+pm_blep(ph,n->inc,n->rcp)-pm_blep(ph+0x80000000u,n->inc,n->rcp);
             x=y+(sq-y)*(shape-64)/63;
         }
-        x=x/2;
+        x=pm_sdiv(x,1);
         /* WARP: the waveshaper's load, asymmetric (even harmonics) and harder as it rises */
         x=pm_soft(pm_product(x,32768+warp*1400)+warp*40)-n->warp0;
         if(n->mods&(1u<<P23_T_MOD3)) x+=n->warp0-pm_soft(warp*40);
@@ -973,7 +977,7 @@ static PE_FAST int32_t pe_sd(pe_node *n,int32_t ext,int32_t white,int32_t pink)
     const uint8_t *k=n->patch.knob;
     int32_t spectral,x,mix=k[P23_SD_MIX],tone=0;
     uint32_t inc=n->inc;
-    if(n->patch.mode==P23_SD_TONE) { tone=pe_sd_tone(n); x=(white+pink)/2; }
+    if(n->patch.mode==P23_SD_TONE) { tone=pe_sd_tone(n); x=pm_sdiv(white+pink,1); }
     else if(n->patch.mode==P23_SD_WALL) x=pe_wall(n,white);
     else {
     if(pe_patched(n,P23_T_MOD1))
@@ -981,7 +985,7 @@ static PE_FAST int32_t pe_sd(pe_node *n,int32_t ext,int32_t white,int32_t pink)
     /* noise band-limited to about the centre frequency drives the oscillator's frequency */
     n->nlp+=pm_product(white-n->nlp,n->np);
     n->phase+=(uint32_t)(((uint64_t)inc*(uint32_t)pm_bound(32768+n->nlp*3,0,131072))>>15);
-    spectral=pm_sine(n->phase)/2+pm_product(n->nlp,12000);
+    spectral=pm_sdiv(pm_sine(n->phase),1)+pm_product(n->nlp,12000);
     x=pink+pm_product(spectral-pink,mix*258);
     }
     if(k[P23_SD_CLAP] && n->clap_age<0xffffffu && n->patch.mode!=P23_SD_WALL) {
@@ -1004,7 +1008,7 @@ static PE_FAST int32_t pe_sd(pe_node *n,int32_t ext,int32_t white,int32_t pink)
     }
     {   /* the band-pass's level held across Q (its resonance may still lift it about 10 dB) */
         const pe_coef *c=pe_filter_c(n,k[P23_SD_BPF],n->patch.mode==P23_SD_WIRE?30:k[P23_SD_Q],P23_T_MOD2);
-        int32_t y=pm_q16(pe_svf_run(&n->filter,pm_product(x,26000),c,1),pm_bound(c->k,19661,131072))*3/2;
+        int32_t y=pm_sdiv(pm_q16(pe_svf_run(&n->filter,pm_product(x,26000),c,1),pm_bound(c->k,19661,131072))*3,1);
         if(n->patch.mode==P23_SD_WALL) return pm_soft(y*4);   /* (the wall clipped hard) */
         return n->patch.mode==P23_SD_TONE?tone+pm_product(y-tone,mix*258):n->patch.mode==P23_SD_WIRE?y:y*2;   /* (NOISE: level with the others) */
     }
@@ -1030,9 +1034,9 @@ static PE_FAST int32_t pe_hht(pe_node *n,int32_t ext,int32_t white)
     x=n->hold_noise;
     /* WARP: an expander: |x|^(1 .. 4), spikier and sparser, its level made up */
     a=pm_abs(x); a2=pm_product(a,a);
-    a=warp<64?a+(a2-a)*warp/64:a2+(pm_product(a2,a2)-a2)*(warp-64)/63;
+    a=warp<64?a+pm_sdiv((a2-a)*warp,6):a2+(pm_product(a2,a2)-a2)*(warp-64)/63;
     a=pm_product(a,32768+warp*500);
-    x=(x<0?-a:a)/2;
+    x=pm_sdiv(x<0?-a:a,1);
     }
     x+=ext;
     return pe_svf_run(&n->filter,x,pe_filter_c(n,k[P23_HHT_HPF],k[P23_HHT_Q],P23_T_MOD2),2);
@@ -1088,7 +1092,7 @@ static PE_FAST void pe_drive_run(pe_node *n,int32_t *x,const int32_t *gm,uint32_
         e=v+pm_product(v-pe_lp(&lp,v,5500),emph);
         u=(int32_t)(((int64_t)e*g)>>12);
         /* the bias: a fixed asymmetry (even harmonics) that sags as the level rises, so the colour breathes */
-        bias=2400-sag/8;
+        bias=2400-pm_sdiv(sag,3);
         y=pe_cubic(u+bias)-pe_cubic(bias);
         sag+=((y<0?-y:y)-sag)>>9;
         y=pm_product(pe_lp(&post,y,pole),comp);
@@ -1116,6 +1120,55 @@ static PE_FAST void pe_wreck_run(pe_node *n,int32_t *x,uint32_t count)
 }
 PM_INLINE int pe_wrecked(const pe_node *n)
 { return (n->patch.fold|n->patch.ring|n->patch.crush|n->patch.bits) && !(pe.diag&2048u); }
+/* TRANSFORM's stage, count samples in place: the effects drawn (DRIVE a soft clip driven 4 .. 20x, FOLD 2 .. 7x,
+ * RING 50 .. 100 % with a triangle at 30 Hz .. 3 kHz, CRUSH a sample held 3 .. 15 samples, BITS 13 or 14 dropped,
+ * rounded so as to add no DC), crossfaded in from mix m0 to m1 across them. For the target's sake (no FPU, every
+ * voice through it): 32-bit products only (the samples held to +/- 10 V first), one pass an effect with no branch
+ * inside, a triangle where a sine would cost a polynomial, and no crossfade at full mix */
+PM_INLINE int32_t pe_soft32(int32_t x)   /* (pm_soft, its square in 32 bits: |x| < 49152 there) */
+{
+    int32_t a=pm_abs(x),t;
+    if(a<=16384) return x;
+    if(a>=49152) return x<0?-32768:32768;
+    t=a-16384; a=16384+t-((t*t)>>16);
+    return x<0?-a:a;
+}
+static PE_FAST void pe_xf_run(pe_node *n,int32_t *x,uint32_t count,int32_t m0,int32_t m1)
+{
+    int32_t dry[P23_BLOCK],g;
+    uint32_t i,set=pe.xf_set,full=m0>=32766 && m1>=32766;
+    for(i=0;i<count;i++) dry[i]=x[i]=pm_bound(x[i],-PE_V10,PE_V10);
+    if(set&XF_DRIVE) {   /* (gain Q8: 4 .. 20x; then -3 dB) */
+        g=pe.xf_gd>>4;
+        for(i=0;i<count;i++) x[i]=(pe_soft32((x[i]*g)>>8)*23170)>>15;
+    }
+    if(set&XF_FOLD) {
+        g=pe.xf_gf>>4;
+        for(i=0;i<count;i++) x[i]=pe_fold((x[i]*g)>>8);
+    }
+    if(set&XF_RING) {
+        uint32_t ph=n->xph,inc=pe.xf_inc; int32_t r=pe.xf_ring>>1;
+        for(i=0;i<count;i++) {
+            uint32_t u=ph>>16; int32_t tri=(int32_t)(u<32768u?u:65535u-u)*2-32767,v=x[i];
+            x[i]=v+((((v*tri)>>15)-v)*r>>14);
+            ph+=inc;
+        }
+        n->xph=ph;
+    }
+    if(set&XF_CRUSH) {
+        uint32_t cnt=n->xcnt,every=pe.xf_every; int32_t hold=n->xhold;
+        for(i=0;i<count;i++) { if(++cnt>=every) { cnt=0; hold=x[i]; } x[i]=hold; }
+        n->xcnt=(uint8_t)cnt; n->xhold=hold;
+    }
+    if(set&XF_BITS) {
+        int32_t mask=pe.xf_mask,half=pe.xf_half;
+        for(i=0;i<count;i++) x[i]=(x[i]+half)&mask;
+    }
+    if(!full) {
+        int32_t m=m0>>1,dm=((m1-m0)>>1)/(int32_t)count;
+        for(i=0;i<count;i++) { x[i]=dry[i]+(((x[i]-dry[i])*m)>>14); m+=dm; }
+    }
+}
 /* once a block: what the knobs set, so the samples only follow what is patched */
 static PE_BLOCK void pe_prepare(pe_node *n,uint32_t index)
 {
@@ -1239,7 +1292,7 @@ PM_INLINE int32_t pe_fx_shift(uint32_t base,uint32_t len,uint16_t *pos,uint32_t 
     *ph+=(uint32_t)(65536-ratio16)*(65536u/(len-64u));
     a=(uint32_t)(((uint64_t)*ph*span)>>32); b=(uint32_t)(((uint64_t)(*ph+0x80000000u)*span)>>32);
     ya=pe_line(base,len,*pos,a+512u); yb=pe_line(base,len,*pos,b+512u);
-    wa=pm_triangle(*ph)/2+16384;
+    wa=pm_sdiv(pm_triangle(*ph),1)+16384;
     return pm_product(ya,wa)+pm_product(yb,32768-wa);
 }
 PM_INLINE int32_t pe_fx_ap(uint32_t base,uint32_t len,uint16_t *pos,int32_t x,int32_t k)
@@ -1276,7 +1329,7 @@ static PE_FAST void pe_fx_tick(int32_t din,int32_t rin)
     dly=f->d1;
     if(mad && mode!=P23_FX_DBL) {
         /* madness: the delay read follows its own output's level, feedback runs past unity, clipped */
-        f->mad_env+=(pm_abs(f->dly_out)-f->mad_env)/32;
+        f->mad_env+=pm_sdiv(pm_abs(f->dly_out)-f->mad_env,5);
         dly+=(uint32_t)f->mad_env/4u;
         if(dly>PE_DLY_LEN-64u) dly-=PE_DLY_LEN-96u;
     }
@@ -1299,7 +1352,7 @@ static PE_FAST void pe_fx_tick(int32_t din,int32_t rin)
         }
         y=pe_fx_shift(PE_DPS_BASE,PE_DPS_LEN,&f->p_dps,&f->shift_a,ratio,y);
     }
-    x=mode==P23_FX_DBL?(y+tap2)/2:y;
+    x=mode==P23_FX_DBL?pm_sdiv(y+tap2,1):y;
     fb=pm_product(f->fb_s,mad && mode!=P23_FX_DBL?42000:31500);
     pe_memw(f->p_dly,din+pm_soft(pm_product(x,fb)));
     f->p_dly=pe_next(f->p_dly,PE_DLY_LEN);
@@ -1329,10 +1382,10 @@ static PE_FAST void pe_fx_tick(int32_t din,int32_t rin)
                 pe_memw(lb+f->p_line[j],z); f->p_line[j]=pe_next(f->p_line[j],line[j]);
                 f->damp[j]+=pm_product(tail-f->damp[j],mode==P23_FX_DBL?26000:19000);
             }
-            f->tank[j]=mad && mode!=P23_FX_DBL?pm_soft(f->damp[j]*5/4):f->damp[j];
+            f->tank[j]=mad && mode!=P23_FX_DBL?pm_soft(pm_sdiv(f->damp[j]*5,2)):f->damp[j];
         }
-        f->rev_out=rev/2+f->tank[0]/4;
-        f->rev_r=rev/2+f->tank[1]/4;
+        f->rev_out=pm_sdiv(rev,1)+pm_sdiv(f->tank[0],2);
+        f->rev_r=pm_sdiv(rev,1)+pm_sdiv(f->tank[1],2);
     }
 }
 static PE_FAST void pe_fx_run(int32_t din,int32_t rin)
@@ -1485,9 +1538,50 @@ void p23_lr_quantize(uint32_t c)
 }
 void p23_clock_reset(void) { pe.clk_count=127u; pe.clk_phase=0xffffffffu; pe_lr_restart(PE_LOOP256-1u); }
 void p23_set_master(uint16_t gain4096) { pe.master=(uint16_t)pm_bound(gain4096,0,4096); }
-void p23_set_stutter(const p23_stutter *s) { if(s) { pe.st=*s; pe.st.slice%=6u; pe.st.mode%=4u; } }
-void p23_stutter_hold(int on) { pe.st_hold=(uint8_t)(on!=0); }
-int p23_stutter_active(void) { return pe.st_on; }
+void p23_set_transform(const p23_transform *x)
+{
+    if(!x) return;
+    pe.xf=*x;
+    pe.xf.tracks&=(1u<<P23_TRACKS)-1u;
+    pe.xf.stack=(uint8_t)pm_bound(x->stack,1,5);
+    if(pe.xf.depth>127) pe.xf.depth=127;
+    if(pe.xf.mix>127) pe.xf.mix=127;
+}
+void p23_transform_hold(int on) { pe.xf_hold=(uint8_t)(on!=0); }
+int p23_transform_active(void) { return pe.xf_on; }
+PM_INLINE uint32_t pe_xf_next(void) { pe.xf_rnd=pe.xf_rnd*1664525u+1013904223u; return pe.xf_rnd; }
+/* once a block: held, the stack (drawn as the hold begins) set by DEPTH, and each
+ * node's mix moved toward MIX (its tracks) or 0 (8 blocks, ~6 ms) */
+static PE_BLOCK void pe_xf_block(void)
+{
+    uint32_t k;
+    if(pe.xf_hold && !pe.xf_on) {
+        uint8_t order[5]={XF_DRIVE,XF_FOLD,XF_RING,XF_CRUSH,XF_BITS};
+        pe.xf_rnd^=pe.xf.seed;
+        for(k=4;k>0;k--) { uint32_t j=(pe_xf_next()>>16)%(k+1u); uint8_t o=order[k]; order[k]=order[j]; order[j]=o; }
+        pe.xf_set=0;
+        for(k=0;k<pe.xf.stack;k++) pe.xf_set|=order[k];
+        for(k=0;k<6;k++) pe.xf_u[k]=(uint8_t)(pe_xf_next()>>24);
+        pe.xf_on=1;
+    } else if(!pe.xf_hold) pe.xf_on=0;
+    if(pe.xf_on) {
+        int32_t q[5];
+        for(k=0;k<5;k++) q[k]=pm_bound((int32_t)pe.xf.depth+((int32_t)pe.xf_u[k]-128)/4,0,127);
+        pe.xf_gd=16384+q[0]*q[0]*4;
+        pe.xf_gf=8192+q[1]*160;
+        pe.xf_ring=16384+q[2]*129;
+        pe.xf_inc=pm_frequency((uint32_t)(((uint64_t)(30u*256u)*pm_exp((int32_t)pe.xf_u[5]*1700))>>16));
+        pe.xf_every=(uint8_t)(3+q[3]/10);
+        pe.xf_half=1<<(12+q[4]/64);
+        pe.xf_mask=~(pe.xf_half*2-1);
+    }
+    for(k=0;k<P23_NODES;k++) {
+        pe_node *n=&pe.node[k];
+        int32_t goal=pe.xf_on && ((pe.xf.tracks>>n->route.track)&1u)?pe.xf.mix*258:0;
+        n->xm0=n->xm;
+        n->xm+=pm_bound(goal-n->xm,-4096,4096);
+    }
+}
 void p23_copy_usb(int32_t *out) { uint32_t i; if(out) for(i=0;i<P23_BLOCK*2;i++) out[i]=pe.usb[i]; }
 void p23_click(int accent)
 { pe.click=6000; pe.click_phase=0; pe.click_step=pm_frequency((accent?1800u:900u)*256u); }
@@ -1632,6 +1726,7 @@ PM_INLINE int32_t pe_voice(pe_node *n,int32_t ext,int32_t white,int32_t pink)
     int32_t x=pe_circuit(n,ext,white,pink);
     if(n->patch.drive && !(pe.diag&2048u)) pe_drive_run(n,&x,(n->rmask&(1u<<P23_RD_DRIVE))?&n->rv[P23_RD_DRIVE]:0,1);
     if(pe_wrecked(n)) pe_wreck_run(n,&x,1);
+    if(n->xm|n->xm0) pe_xf_run(n,&x,1,n->xm,n->xm);
     if(n->rmask&(1u<<P23_RD_VCA)) x=pm_product(x,pm_bound(PE_V10+pe_route(n,P23_RD_VCA),0,2*PE_V10));   /* x (1 + v / 10 V) */
     return x;
 }
@@ -1697,6 +1792,7 @@ static PE_FAST void pe_node_block(pe_node *n,uint32_t part)
         n->eb=0;
         if(n->patch.drive && !(pe.diag&2048u)) pe_drive_run(n,raw,rdrv?gm:0,P23_BLOCK);
         if(pe_wrecked(n)) pe_wreck_run(n,raw,P23_BLOCK);
+        if(n->xm|n->xm0) pe_xf_run(n,raw,P23_BLOCK,n->xm0,n->xm);
         if(rvca) for(i=0;i<P23_BLOCK;i++) raw[i]=pm_product(raw[i],pm_bound(PE_V10+vm[i],0,2*PE_V10));   /* x (1 + v / 10 V) */
     } else { for(i=0;i<P23_BLOCK;i++) raw[i]=0; n->strike=0; }
     for(i=0;i<P23_BLOCK;i++) {
@@ -1717,7 +1813,7 @@ PM_INLINE uint32_t pe_cost(const pe_node *n)
 {
     static const uint8_t C[4]={4,6,5,4};
     uint32_t c=C[n->patch.module&3u]+(n->patch.mode?(n->patch.module==P23_BASS && n->patch.mode==P23_BASS_PRC?2u:1u):0u);
-    return c+(n->patch.drive?1u:0u)+(pe_wrecked(n)?1u:0u)+n->nr;
+    return c+(n->patch.drive?1u:0u)+(pe_wrecked(n)?1u:0u)+((n->xm|n->xm0)?1u+pe.xf.stack/3u:0u)+n->nr;
 }
 /* the block's first part (one core): the panel, every node's gate and preparation; silent nodes rest, those with
  * a cable into them follow the patch sample by sample, the others are shared between the two parts */
@@ -1728,6 +1824,7 @@ uint32_t p23_process_begin(void)
     if(pe.diag&32u) return 0;
     if(pe.diag&64u) for(k=0;k<P23_TRACKS;k++) pe.node[k].note_gate=PE_V10;
     pe_block();
+    pe_xf_block();
     if(!(pe.diag&16u)) for(k=0;k<P23_NODES;k++) pe_prepare(&pe.node[k],k);
     /* the block's noise, its buses, and the tracks' patched OUT / ENV */
     for(i=0;i<P23_BLOCK;i++) { pe_noise(); pe.wbuf[i]=pe.white; pe.pbuf[i]=pe.pink_out; }
@@ -1783,56 +1880,6 @@ void p23_process_drop(uint32_t part)
         pe.bl[part][i]=pe.br[part][i]=pe.bs[part][i]=0;
         for(t=0;t<P23_TRACKS;t++) pe.tout[part][t][i]=pe.tenv[part][t][i]=0;
     }
-}
-/* the stutter, a sample: the output written to its memory; held, the slice just heard (from the next 32nd while the
- * clock runs) played in its place -- each pass quieter by DECAY, faster or slower by DRIFT, halved by ROLL, its way by
- * MODE -- faded in and out by MIX */
-PM_INLINE void pe_stutter(int32_t *l,int32_t *r)
-{
-    const p23_stutter *s=&pe.st;
-    int32_t y=0,goal;
-    if(pe.st_hold && !pe.st_on && (pe.clk_edge || !pe.panel.clock_run || pe.panel.clock_source!=P23_CLK_INT)) {
-        static const uint8_t MUL3[6]={3,6,12,24,4,8};   /* (in thirds of a 32nd) */
-        uint32_t s32=3307500u/(pe.panel.bpm10?pe.panel.bpm10:1200u),len=s32*MUL3[s->slice]/3u;
-        pe.st_len=len>PE_ST_LEN-64u?PE_ST_LEN-64u:len<64u?64u:len;
-        pe.st_cap=(pe.st_w+PE_ST_LEN-pe.st_len)&(PE_ST_LEN-1u);
-        pe.st_pos=0; pe.st_loops=0; pe.st_gain=32768; pe.st_dir=s->mode==P23_ST_REV;
-        pe.st_rate=pm_exp(((int32_t)s->rate-64)*2048)>>8;
-        pe.st_on=1;
-    } else if(!pe.st_hold) pe.st_on=0;
-    if(pe.st_on || pe.st_xf) {
-        uint32_t p,e;
-        if(pe.st_on) {
-            pe.st_pos+=pe.st_rate;
-            if((pe.st_pos>>8)>=pe.st_len) {      /* (a pass done) */
-                pe.st_pos%=pe.st_len<<8;
-                pe.st_loops++;
-                pe.st_gain=pe.st_gain*(256-(int32_t)s->decay)/256;
-                pe.st_rate=(uint32_t)pm_bound((int32_t)((pe.st_rate*pm_exp(((int32_t)s->drift-64)*512))>>16),16,4096);
-                pe.st_rnd=pe.st_rnd*1664525u+1013904223u;
-                if(s->mode==P23_ST_ALT) pe.st_dir^=1u;
-                if(s->mode==P23_ST_RND) {
-                    static const uint8_t RR[4]={128,255,255,255};
-                    pe.st_dir=(uint8_t)(pe.st_rnd>>31);
-                    pe.st_rate=(pm_exp(((int32_t)s->rate-64)*2048)>>8)*RR[(pe.st_rnd>>20)&3u]/255u*((pe.st_rnd>>22)&1u?2u:1u);
-                }
-                if(s->roll && !(pe.st_loops%(1u+(127u-s->roll)/16u)) && pe.st_len>256u) { pe.st_len>>=1; pe.st_pos%=pe.st_len<<8; }
-            }
-        }
-        p=pe.st_pos>>8;
-        if(p>=pe.st_len) p=pe.st_len-1u;
-        y=pe.st_buf[(pe.st_cap+(pe.st_dir?pe.st_len-1u-p:p))&(PE_ST_LEN-1u)]*4;
-        e=p<pe.st_len-p?p:pe.st_len-p;                 /* (the loop's edges faded) */
-        if(e<48u) y=y*(int32_t)e/48;
-        y=pm_product(y,pe.st_gain);
-    }
-    goal=pe.st_on?s->mix*258:0;
-    pe.st_xf+=pm_bound(goal-pe.st_xf,-64,64);
-    if(!pe.st_on) {                                  /* (the output, a quarter, written while nothing is held) */
-        pe.st_buf[pe.st_w]=(int16_t)pm_bound((*l+*r)/8,-32767,32767);
-        pe.st_w=(pe.st_w+1u)&(PE_ST_LEN-1u);
-    }
-    if(pe.st_xf) { *l+=pm_product(y-*l,pe.st_xf); *r+=pm_product(y-*r,pe.st_xf); }
 }
 /* the block's last part (the first core): the parts' buses joined, then the patch, the nodes with cables, the FX
  * and the output sample by sample */
@@ -1908,8 +1955,7 @@ PE_HOT void p23_process_end(int32_t stereo[P23_BLOCK*2])
         /* MIX IN, AC-coupled */
         mix_in=pe_driven(P23_PIN_MIX_IN)?pe_in(P23_PIN_MIX_IN):0;
         mix_in=pe_driven(P23_PIN_MIX_IN)?pe_hp(&pe.mix_dc,mix_in,30):0;
-        l+=mix_in/2; r+=mix_in/2;
-        pe_stutter(&l,&r);
+        l+=pm_sdiv(mix_in,1); r+=pm_sdiv(mix_in,1);
         for(j=0;j<2;j++) {
             int32_t x=j?r:l;
             if(pe.diag&128u) { stereo[2u*i+j]=0; continue; }
@@ -1917,14 +1963,14 @@ PE_HOT void p23_process_end(int32_t stereo[P23_BLOCK*2])
                 /* parallel distortion over the whole bus: high gain into an asymmetric clipper */
                 int32_t gain=32768+(int32_t)pe.panel.drive*pe.panel.drive*64,wet;
                 wet=pm_soft(pm_product(x,gain)+3000)-pm_soft(3000);
-                wet=pm_soft(wet*2)/2;
+                wet=pm_sdiv(pm_soft(wet*2),1);
                 pe.dist_acc[j]+=wet;
-                wet-=pe.dist_dc[j]/256;
+                wet-=pm_sdiv(pe.dist_dc[j],8);
                 x+=pm_product(wet-x,pe.panel.drive_mix*258);
             }
             x=pm_bound(x,-120000,120000);
             pe.out_acc[j]+=x;
-            x-=pe.out_dc[j]/256;
+            x-=pm_sdiv(pe.out_dc[j],8);
             if(pe.click) x+=pm_product(pm_sine(pe.click_phase),pe.click);
             pe.usb[2u*i+j]=pm_bound(pm_soft(x*2),-32767,32767);   /* (6 dB hotter into the output's soft clip) */
             stereo[2u*i+j]=pm_product(pe.usb[2u*i+j],pe.master*8);

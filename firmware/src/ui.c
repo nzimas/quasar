@@ -24,7 +24,7 @@
  *                             it, every track. Let go, each plays on from where it is. The way shows in the band
  *   the 5th black key         (the step view off) the track's arpeggiator on or off (tracks.c; lit while on): the keys
  *                             held go to it, it plays them in turn (build 52); held 0.8 s: its page (ARP) up or down
- *   the 6th black key         (the step view off; dim) SHIFT and it held: the STUTTER; held alone 0.8 s, its page
+ *   the 6th black key         (the step view off; dim) SHIFT and it held: TRANSFORM; held alone 0.8 s, its page
  *   the 7th black key         (the step view off; in it, with SHIFT) PERFORMANCE on or off (lit while on): the state
  *                             kept, given back as it goes off; meanwhile KNOB 1 .. 4 every track with notes (projects.c)
  *   the rightmost black key   SHIFT
@@ -110,8 +110,8 @@ static const uint8_t KNOB[4] = {EN_K1, EN_K2, EN_K3, EN_K4};
 #define KEY_TRIG 5u                  /* (the 3rd: TRIG, the step held's own page) */
 #define KEY_MOD 8u                   /* (the 4th: MOD, the step held's MUTATE and MIDI FX) */
 #define KEY_ARP 10u                  /* (the 5th: out of the step view, the track's arpeggiator; build 52) */
-#define KEY_STUT 13u                 /* (the 6th: out of the step view, the STUTTER -- SHIFT and it held: it plays; held
-                                      * alone 0.8 s, its page) */
+#define KEY_XF 13u                   /* (the 6th: out of the step view, TRANSFORM -- SHIFT and it held: on; held alone
+                                      * 0.8 s, its page) */
 #define KEY_PERF 15u                 /* (the 7th: PERFORMANCE on or off -- in the step view, with SHIFT) */
 static const uint8_t KEY_DIR[3] = {13, 15, 17};  /* (the 6th .. 8th: REVERSE, PING-PONG, RANDOM) */
 static const char *const DIR_NAME[NDIR] = {"FORWARD", "REVERSE", "PING-PONG", "RANDOM"};
@@ -160,9 +160,9 @@ static struct {
     uint32_t gen_until;          /* the phrase key lit fully until */
     uint8_t gen_down, gen_long, gen_sh;   /* the phrase key held: since gen_t0; held 0.8 s (its page); SHIFT with it */
     uint32_t gen_t0;
-    uint8_t stk_down, stk_long, stk_on;   /* the STUTTER's key (the 6th black key) held: since stk_t0; its page
-                                  * shown; SHIFT with it: stuttering */
-    uint32_t stk_t0;
+    uint8_t xk_down, xk_long, xk_on;   /* TRANSFORM's key (the 6th black key) held: since xk_t0; its page
+                                  * shown; SHIFT with it: transforming */
+    uint32_t xk_t0;
     uint8_t ak_down, ak_long;    /* the 5th black key (the arpeggiator's) held: since ak_t0; held 0.8 s (its page;
                                   * build 53) */
     uint32_t ak_t0;
@@ -244,11 +244,11 @@ static uint8_t row_learn;                        /* (draw_row: MIDI LEARN's -- t
  * and distortion, the attenuators, the touch and MIDI CVs, the patchbay), then the chosen track's DUCK and its
  * three automation LFOs (Bigorna's, the sound's) */
 enum { FXP_CLK, FXP_LR,   /* (FXP_CLK: kept for the numbering MIDI LEARN saves, never shown -- the clock follows the tempo) */
-        FXP_SH, FXP_LFOP, FXP_FX, FXP_MIX, FXP_STUT, FXP_CV, FXP_PATCH, FXP_CMP, FXP_L1, FXP_L2, FXP_L3,
+        FXP_SH, FXP_LFOP, FXP_FX, FXP_MIX, FXP_XF, FXP_CV, FXP_PATCH, FXP_CMP, FXP_L1, FXP_L2, FXP_L3,
        NFXP };
 #define FXP_ARP NFXP                             /* (the chosen track's arpeggiator: SHIFT + the 5th black key, not in
                                                   * SEQ's turn; build 52) */
-static const char *const FXT[NFXP + 1] = {"CLOCK", "LOOPER", "SHAOS", "LFO", "FX", "MIX", "STUTTER", "CV", "PATCH",
+static const char *const FXT[NFXP + 1] = {"CLOCK", "LOOPER", "SHAOS", "LFO", "FX", "MIX", "TRANSFORM", "CV", "PATCH",
                                          "DUCK", "AUTO 1", "AUTO 2", "AUTO 3", "ARP"};
 /* a panel page's row: its name, its byte in pnl[] (PN_*; PNR_*: an action), and a list (n names) or 0 .. 127 */
 typedef struct { const char *name; uint8_t idx, n; const char *const *list; } pnr_t;
@@ -264,10 +264,9 @@ static const char *const PL_VEL[3] = {"H", "M", "L"};
 static const char *const PL_BANK[4] = {"1", "2", "3", "4"};
 static const char *const PL_RUN[9] = {"STOP", "1", "2", "3", "4", "5", "6", "7", "8"};
 static const char *const PL_GO[2] = {"-", "GO"};
-static const char *const PL_SLC[7] = {"1/32", "1/16", "1/8", "1/4", "1/16T", "1/8T", "RND"};   /* (RND, and MODE's: each
-                                                  * press its own -- engine_control.c's stut_pick) */
-static const char *const PL_STM[5] = {"FWD", "REV", "ALT", "WILD", "RND"};   /* (WILD: each pass its own direction and
-                                                  * speed, the engine's P23_ST_RND) */
+/* TRANSFORM's lists, RND first (each press its own: engine_control.c's xf_draw) */
+static const char *const PL_XFT[6] = {"RND", "2", "3", "4", "5", "ALL"};
+static const char *const PL_XFS[6] = {"RND", "1", "2", "3", "4", "5"};
 #define PR(nm, i) {nm, i, 0, 0}
 #define PRL(nm, i, n, l) {nm, i, n, l}
 #define PR0 {"", PNR_NONE, 0, 0}
@@ -282,8 +281,8 @@ static const pnr_t PNR[FXP_PATCH][8] = {
      PR("FB", PN_FX_FB), PR("CLK MOD", PN_FX_CLK), PRL("MAD!", PN_FX_MAD, 2, PL_OFFON), PR0},
     {PR("DLY OUT", PN_DLY_OUT), PR("REV OUT", PN_REV_OUT), PR("DRIVE", PN_DRIVE), PR("DIST MIX", PN_DMIX),
      PR0, PR0, PR0, PR0},
-    {PRL("SLICE", PN_ST_SLICE, 7, PL_SLC), PR("RATE", PN_ST_RATE), PRL("MODE", PN_ST_MODE, 5, PL_STM), PR("DECAY", PN_ST_DECAY),
-     PR("DRIFT", PN_ST_DRIFT), PR("ROLL", PN_ST_ROLL), PR("MIX", PN_ST_MIX), PR0},   /* (the STUTTER: in the ATTEN page's place) */
+    {PRL("TRACKS", PN_XF_TRACKS, 6, PL_XFT), PRL("STACK", PN_XF_STACK, 6, PL_XFS), PR("DEPTH", PN_XF_DEPTH),
+     PR("MIX", PN_XF_MIX), PR0, PR0, PR0, PR0},   /* (TRANSFORM: in the ATTEN page's place) */
     {PR("TOUCH 1", PN_TOUCH1), PR("TOUCH 2", PN_TOUCH2), PR0, PR0, PR("MIDI CV 1", PN_MCV1), PR("MIDI CV 2", PN_MCV2),
      PR("MIDI CV 3", PN_MCV3), PR("MIDI CV 4", PN_MCV4)},
 };
@@ -550,7 +549,7 @@ static int step_view(void);
 static int key_plays(uint32_t k)
 {
     return k != KEY_SHIFT && k != KEY_EDIT && k != KEY_STEP &&
-           ((k != KEY_GEN && k != KEY_TRK && k != KEY_TRIG && k != KEY_MOD && k != KEY_ARP && k != KEY_STUT &&
+           ((k != KEY_GEN && k != KEY_TRK && k != KEY_TRIG && k != KEY_MOD && k != KEY_ARP && k != KEY_XF &&
              k != KEY_PERF) || step_view()) &&
            /* (out of the step view the 1st black key is CHORD mode's, the 2nd MUTE mode's, the 3rd BREAK, the 4th
             * MIDI LEARN) */
@@ -931,7 +930,7 @@ static int fx_arp(void) { return ui.fx_pg == FXP_ARP; }
 static int fx_pnl(void) { return ui.fx_pg < FXP_PATCH; }
 /* (Quasar: the panel pages not shown -- CLOCK, LOOPER, ATTEN, CV, PATCH: nothing of them sounds without cables, and
  * there are none; kept in the numbering MIDI LEARN saves) */
-static int fxp_hidden(uint32_t pg) { return pg == FXP_CLK || pg == FXP_LR || pg == FXP_STUT || pg == FXP_CV || pg == FXP_PATCH; }
+static int fxp_hidden(uint32_t pg) { return pg == FXP_CLK || pg == FXP_LR || pg == FXP_XF || pg == FXP_CV || pg == FXP_PATCH; }
 static uint32_t fxp_step(uint32_t pg, int d)     /* (the next page shown, d +1 / -1, wrapping) */
 {
     uint32_t i;
@@ -1081,11 +1080,12 @@ static uint32_t fx_n(void)
 }
 /* a page's parameter: 0 shown as it is (an LFO's START), 1 as 0 .. 100, 3 a list (SC SOURCE; an LFO's MULT, WAVE,
  * MODE; the panel's switches), 4 as -64 .. +63 (an LFO's SPEED, FADE, DEPTH), 5 an LFO's DEST, 6 a pin, 7 a cable
- * number, 8 a voltage, 9 as 0 .. 100 then RND (ST_VAL_RND: the STUTTER's RATE, DECAY) */
+ * number, 8 a voltage, 9 RND then 0 .. 100 (TRANSFORM's DEPTH, MIX: 0 RND, 1 .. 101) */
 static uint32_t fx_kind(uint32_t j)
 {
     if (fx_pnl())
-        return pn_row(j)->n ? 3u : pn_row(j)->idx == PN_ST_RATE || pn_row(j)->idx == PN_ST_DECAY ? 9u : 1u;
+        return pn_row(j)->n ? 3u
+               : pn_row(j)->idx == PN_XF_DEPTH || pn_row(j)->idx == PN_XF_MIX ? 9u : 1u;
     if (fx_patch())
         return j == 0 ? 7u : j < 3u ? 6u : 8u;
     if (fx_arp())
@@ -1126,9 +1126,8 @@ static void fx_turn(uint32_t j, int32_t s)
     v = fx_get(j);
     if (kd == 8u)
         return;
-    if (kd == 9u) {                              /* (past 100: RND; back from it: 100) */
-        int32_t d = clampi((v >= (int32_t)ST_VAL_RND ? 101 : pct_disp(v)) + s, 0, 101);
-        fx_put(j, d == 101 ? (int32_t)ST_VAL_RND : pct_raw(d));
+    if (kd == 9u) {                              /* (below 0: RND) */
+        fx_put(j, clampi(v + s, 0, 101));
         prj_dirty = 1;
         return;
     }
@@ -1773,6 +1772,7 @@ static int learn_cc(uint32_t ch, uint32_t cc, uint32_t v)
             if (k < fx_n() && fx_kind(k) != 5u) {
                 uint32_t kd = fx_kind(k);
                 fx_put(k, kd == 3u ? (int32_t)((v * (fx_list_n(k) - 1u) + 63u) / 127u)
+                          : kd == 9u ? (int32_t)((v * 101u + 63u) / 127u)
                           : (int32_t)v);
                 if (fx_lfo())
                     mark(ui.sl);
@@ -2731,39 +2731,38 @@ static void ui_input(void)
             ui.force = 1;
         }
     }
-    if (ui.stk_down) {                                /* the STUTTER's key: SHIFT and it held, the stutter plays (in
-                                                      * either order); held alone 0.8 s, its page up or down */
-        if (!((keys >> KEY_STUT) & 1u) || step_view()) {
-            ui.stk_down = 0;
-        } else if (sh && !ui.stk_long) {
-            if (!ui.stk_on) {
-                uint32_t r = next_seed(), q = next_seed();   /* (the page's RND settings: drawn anew, before it
-                                                              * starts -- the seeds' high bits) */
-                stut_pick[0] = (uint8_t)((r >> 16) % ST_SLC_RND);
-                stut_pick[1] = (uint8_t)(r >> 25);
-                stut_pick[2] = (uint8_t)((q >> 16) % ST_MODE_RND);
-                stut_pick[3] = (uint8_t)(q >> 25);
-                ui.stk_on = 1;
-                say("STUTTER", 60000);
+    if (ui.xk_down) {                                /* TRANSFORM's key: SHIFT and it held, TRANSFORM on (in either
+                                                      * order); held alone 0.8 s, its page up or down */
+        if (!((keys >> KEY_XF) & 1u) || step_view()) {
+            ui.xk_down = 0;
+        } else if (sh && !ui.xk_long) {
+            if (!ui.xk_on) {
+                uint32_t t, have = 0;                /* (the page's RND settings drawn anew, before it starts) */
+                for (t = 0; t < NTRACK; t++)
+                    if (trk_material(t))
+                        have |= 1u << t;
+                xf_draw(have, next_seed(), &xf_now);
+                ui.xk_on = 1;
+                say("TRANSFORM", 60000);
             }
-        } else if (!ui.stk_on && !ui.stk_long && (uint32_t)(fm1_ms - ui.stk_t0) >= 800u) {
-            ui.stk_long = 1;
-            if (ui.page == PG_FXP && ui.fx_pg == FXP_STUT)
+        } else if (!ui.xk_on && !ui.xk_long && (uint32_t)(fm1_ms - ui.xk_t0) >= 800u) {
+            ui.xk_long = 1;
+            if (ui.page == PG_FXP && ui.fx_pg == FXP_XF)
                 ui.page = PG_MAIN;
             else {
                 ui.page = PG_FXP;
-                ui.fx_pg = FXP_STUT;
+                ui.fx_pg = FXP_XF;
                 ui.ehalf = ui.lsel = ui.listen = 0;
             }
             ui.force = 1;
         }
     }
-    if (ui.stk_on && (!ui.stk_down || !sh)) {      /* (either let go: the stutter stops) */
-        ui.stk_on = 0;
+    if (ui.xk_on && (!ui.xk_down || !sh)) {      /* (either let go: TRANSFORM off) */
+        ui.xk_on = 0;
         ui.msg_until = fm1_ms;
         ui.force = 1;
     }
-    stut_ui = ui.stk_on;
+    xf_ui = ui.xk_on;
     if (ui.ak_down) {                                /* the arpeggiator's key: let go soon, the track's arpeggiator on
                                                       * or off; held 0.8 s, its page (ARP) up or down */
         if (!((keys >> KEY_ARP) & 1u)) {
@@ -2827,10 +2826,10 @@ static void ui_input(void)
             perf_toggle();
             continue;
         }
-        if (((ch & keys) >> k & 1u) && !step_view() && k == KEY_STUT && !pg_any()) {   /* the STUTTER's key */
-            ui.stk_down = 1;
-            ui.stk_long = 0;
-            ui.stk_t0 = fm1_ms;
+        if (((ch & keys) >> k & 1u) && !step_view() && k == KEY_XF && !pg_any()) {   /* TRANSFORM's key */
+            ui.xk_down = 1;
+            ui.xk_long = 0;
+            ui.xk_t0 = fm1_ms;
             continue;
         }
         if (((ch & keys) >> k & 1u) && !step_view() && k == KEY_ARP && !pg_any()) {   /* the arpeggiator's key: on
@@ -3046,9 +3045,9 @@ static void ui_leds(void)
             led_dim_key(14u + k, 1);
             continue;
         }
-        if (!step_view() && k == KEY_STUT && !pg_any()) {   /* (the STUTTER key: dim, lit while it plays or its
+        if (!step_view() && k == KEY_XF && !pg_any()) {   /* (TRANSFORM's key: dim, lit while it is on or its
                                                              * page is up) */
-            fm1_led_key(14u + k, ui.stk_on || (ui.page == PG_FXP && ui.fx_pg == FXP_STUT));
+            fm1_led_key(14u + k, ui.xk_on || (ui.page == PG_FXP && ui.fx_pg == FXP_XF));
             led_dim_key(14u + k, 1);
             continue;
         }
@@ -3310,8 +3309,10 @@ static void draw_rows_title(const char *t1, const char *t2, uint16_t col)
     cv_begin(240, 52, C_BLACK);
     if (text_w(&FONT_M, t1) + text_w(&FONT_S, t2) + 16 <= 232)   /* the page, large; where it is (2/8, A-D), right */
         cv_text(4, 4, &FONT_M, t1, col);
-    else                                              /* (both not fitting: the page smaller) */
+    else if (text_w(&FONT_S, t1) + text_w(&FONT_S, t2) + 16 <= 232)   /* (both not fitting: the page smaller .. */
         cv_text(4, 4 + ((int32_t)FONT_M.h - (int32_t)FONT_S.h) / 2, &FONT_S, t1, col);
+    else                                              /* (.. or smaller still: TRANSFORM) */
+        cv_text(4, 4 + ((int32_t)FONT_M.h - (int32_t)FONT_XS.h) / 2, &FONT_XS, t1, col);
     cv_text(236 - text_w(&FONT_S, t2), 4 + ((int32_t)FONT_M.h - (int32_t)FONT_S.h) / 2, &FONT_S, t2, C_WHITE);
     cv_rect(4, 46, 232, 2, RGB(60, 60, 60));
     cv_rect(ui.half ? 120 : 4, 46, 116, 4, col);      /* (which half: A .. D left, E .. H right) */
@@ -3451,8 +3452,12 @@ static void fx_text(uint32_t k, int32_t x, char *b)   /* an effect's parameter k
         }
     } else if (fx_pnl() && fx_kind(k) == 3u)
         str_cpy(b, pn_row(k)->list[clampi(x, 0, pn_row(k)->n - 1)], 10);
-    else if (fx_pnl() && fx_kind(k) == 9u && x >= (int32_t)ST_VAL_RND)
-        str_cpy(b, "RND", 4);
+    else if (fx_pnl() && fx_kind(k) == 9u) {
+        if (x <= 0)
+            str_cpy(b, "RND", 4);
+        else
+            fmt_int(b, x - 1);
+    }
     else if (fx_patch() && k == 0) {
         fmt_int(b, x + 1);
         str_cpy(b + str_len(b), "/32", 4);
@@ -3538,6 +3543,7 @@ static void draw_fx_page(void)
                  : k < fx_n() && fx_kind(k) == 6u ? x * 1000 / (int32_t)(P23_PINS - 1u)
                  : k < fx_n() && fx_kind(k) == 7u ? x * 1000 / (int32_t)(NPCAB - 1u)
                  : k < fx_n() && fx_kind(k) == 8u ? clampi(x, 0, P23_VOLT * 10) * 100 / P23_VOLT
+                 : k < fx_n() && fx_kind(k) == 9u ? clampi(x - 1, 0, 100) * 10
                  : clampi(x, 0, 127) * 1000 / 127,
                  k < fx_n() && (fx_kind(k) == 2u || fx_kind(k) == 4u), (int32_t)j == t,
                  fx_lfo() || fx_arp() ? TRACK_COL[ui.sel] : row_tint ? row_tint : C_SEND);

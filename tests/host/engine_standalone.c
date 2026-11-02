@@ -370,10 +370,10 @@ static void test_modes(void)
         CHECK(pk>300 && pk<=32767 && pk2<40,msg);
     }
 }
-/* WRECK changes the voice and keeps it bounded; the stutter repeats the mix while held, and only then */
-static void test_wreck_stut(void)
+/* WRECK changes the voice and keeps it bounded */
+static void test_wreck(void)
 {
-    p23_patch p=module(P23_BD,0); uint32_t plain,folded,k; int32_t pk; uint64_t e_stut,e_off;
+    p23_patch p=module(P23_BD,0); uint32_t plain,folded; int32_t pk;
     p.knob[P23_BD_PITCH]=0; p.release=127;
     fresh(51); solo(0); p23_set_patch(0,&p); p23_note(0,0,48,127,1); blocks(40); plain=crossings(100);
     p.fold=110; fresh(51); solo(0); p23_set_patch(0,&p); p23_note(0,0,48,127,1); blocks(40); folded=crossings(100);
@@ -381,30 +381,57 @@ static void test_wreck_stut(void)
     p.fold=127; p.ring=127; p.ring_freq=90; p.crush=127; p.bits=127;
     fresh(51); solo(0); p23_set_patch(0,&p); p23_note(0,0,48,127,1); blocks(40); energy(100,&pk);
     CHECK(pk>500 && pk<=32767,"WRECK at its extremes: heard, bounded");
-    {   /* a pattern of hits, with the stutter held from bar 2 and without: the outputs part ways while it is held,
-         * and meet again once it is let go and its fade is over */
-        static int32_t a[1600*P23_BLOCK*2]; uint64_t diff=0,base=0,after=0; uint32_t b,i;
-        p23_stutter st={1,64,P23_ST_FWD,0,64,0,127};
-        for(k=0;k<2;k++) {
-            p23_patch q=module(P23_SD,0); q.release=10;
-            fresh(52); solo(0); p23_set_patch(0,&q); p23_set_stutter(&st); p23_clock_reset(); p23_stutter_hold(0);
-            for(b=0;b<1600;b++) {
-                if(b%45==0) p23_note(0,0,60,127,1);
-                if(b%45==3) p23_note(0,0,60,0,0);
-                if(k) p23_stutter_hold(b>=300 && b<1200);
-                p23_process(out);
-                for(i=0;i<P23_BLOCK*2;i++) {
-                    if(!k) { a[b*P23_BLOCK*2+i]=out[i]; if(b>=300 && b<1200) base+=(uint64_t)((int64_t)out[i]*out[i]); }
-                    else { int64_t d=(int64_t)out[i]-a[b*P23_BLOCK*2+i]; if(b>=300 && b<1200) diff+=(uint64_t)(d*d); if(b>=1300) after+=(uint64_t)(d*d); }
-                }
-            }
-        }
-        e_stut=diff; e_off=base;
-        CHECK(after*1000<base,"the stutter let go: the mix as without it (its DC blocking aside)");
+}
+/* TRANSFORM over a pattern of hits, held from block 300 to 1200, against the same pattern without it: the sound
+ * changes while held, the hits stay where they were (silent between them), the mix is as before once it is let go;
+ * a track left out is untouched */
+static void xf_run(const p23_transform *x,int held,int32_t *dst,uint32_t n)
+{
+    p23_patch q=module(P23_SD,0); uint32_t b;
+    q.release=10;
+    fresh(52); solo(0); p23_set_patch(0,&q); p23_set_transform(x); p23_clock_reset(); p23_transform_hold(0);
+    for(b=0;b<n;b++) {
+        if(b%45==0) p23_note(0,0,60,127,1);
+        if(b%45==3) p23_note(0,0,60,0,0);
+        p23_transform_hold(held && b>=300 && b<1200);
+        p23_process(out);
+        memcpy(dst+b*P23_BLOCK*2,out,sizeof out);
     }
-    CHECK(e_stut>e_off/4,"the stutter held replaces the mix with its repeats");
-
-
+}
+static void test_transform(void)
+{
+    static int32_t a[1600*P23_BLOCK*2],c[1600*P23_BLOCK*2];
+    uint32_t stack,seed,b,i,quiet_bad=0,heard=0,runs=0,after_bad=0;
+    xf_run(&(p23_transform){0},0,a,1600);
+    for(stack=1;stack<=5;stack++) for(seed=1;seed<=4;seed++) {
+        p23_transform x={1,(uint8_t)stack,(uint8_t)(seed*30),127,seed*7919u};
+        uint64_t diff=0,base=0,after=0;
+        xf_run(&x,1,c,1600); runs++;
+        for(b=0;b<1600;b++) {
+            uint64_t ea=0,ec=0; int64_t ma=0,mc=0;   /* (each block's energy about its mean: a DC blocker's slow
+                                                      * recovery is no sound) */
+            for(i=0;i<P23_BLOCK*2;i++) { ma+=a[b*P23_BLOCK*2+i]; mc+=c[b*P23_BLOCK*2+i]; }
+            ma/=(int64_t)(P23_BLOCK*2); mc/=(int64_t)(P23_BLOCK*2);
+            for(i=0;i<P23_BLOCK*2;i++) {
+                int64_t u=a[b*P23_BLOCK*2+i],v=c[b*P23_BLOCK*2+i],d=v-u;
+                ea+=(uint64_t)((u-ma)*(u-ma)); ec+=(uint64_t)((v-mc)*(v-mc));
+                if(b>=300 && b<1200) { diff+=(uint64_t)(d*d); base+=(uint64_t)(u*u); }
+                if(b>=1300) after+=(uint64_t)(d*d);
+            }
+            if(b>=300 && b<1200 && ea<1000u && ec>4000000u) quiet_bad++;   /* (sound where there was none, above -42 dB:
+                                                                            * drive lifts a hit's last -60 dB of tail) */
+        }
+        if(diff>base/50u) heard++;
+        if(after*1000u>=base) after_bad++;
+    }
+    CHECK(heard==runs,"TRANSFORM held: every stack drawn changes the sound");
+    CHECK(!quiet_bad,"TRANSFORM held: no sound between the hits (it changes how, not when)");
+    CHECK(!after_bad,"TRANSFORM let go: the mix as without it");
+    {
+        p23_transform x={2,5,127,127,99u};   /* (track 2 only: track 1 untouched) */
+        xf_run(&x,1,c,1600);
+        CHECK(!memcmp(a,c,sizeof a),"TRANSFORM leaves the tracks it was not given alone");
+    }
 }
 int main(void)
 {
@@ -422,7 +449,8 @@ int main(void)
     test_routes_drive();
     test_split();
     test_modes();
-    test_wreck_stut();
+    test_wreck();
+    test_transform();
     CHECK(order_hash(0)==order_hash(1),"patch feedback independent of node order");
     {
         int32_t usb[P23_BLOCK*2]; p23_patch p=module(P23_BD,1);

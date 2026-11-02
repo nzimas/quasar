@@ -39,8 +39,11 @@ enum { PN_CLK_SRC, PN_CLK_AMT, PN_SH_FREQ, PN_SH_LEN, PN_LFO_FREQ, PN_LFO_SHAPE,
        PN_FX_MODE, PN_FX_ROUTE, PN_FX_TIME, PN_FX_TUNE, PN_FX_FB, PN_FX_CLK, PN_FX_MAD, PN_DLY_OUT, PN_REV_OUT,
        PN_DRIVE, PN_DMIX, PN_ATT1, PN_ATT2, PN_ATT3, PN_ATT4, PN_TOUCH1, PN_TOUCH2, PN_MCV1, PN_MCV2, PN_MCV3,
        PN_MCV4, PN_LR_BANK, PN_LR_VEL, PN_LR_MODE1, PN_LR_MODE6=PN_LR_MODE1+5,
-       PN_ST_SLICE, PN_ST_RATE, PN_ST_MODE, PN_ST_DECAY, PN_ST_DRIFT, PN_ST_ROLL, PN_ST_MIX,   /* (the STUTTER's) */
-       PN_CTRL_ALL, NPN };   /* (the session's CTRL ALL: 0 KNOBS, 1 ALL -- ui.c's PERFORMANCE; not the engine's) */
+       PN_XF_TRACKS, PN_XF_STACK, PN_XF_DEPTH, PN_XF_MIX, PN_RES41, PN_RES42, PN_RES43,   /* (TRANSFORM's; then kept,
+                             * unused: its SPACE, SEND and TIME, taken out -- the delay and reverb they woke) */
+       PN_CTRL_ALL,          /* (the session's CTRL ALL: 0 KNOBS, 1 ALL -- ui.c's PERFORMANCE; not the engine's) */
+       PN_RES45, PN_XF_MARK, NPN };   /* (.. kept, unused: FEEDBACK's; XF_MARK: TRANSFORM's bytes as this build
+                                       * reads them, not the STUTTER's nor the first TRANSFORM's) */
 #define NPNL 48u
 #define PNL_MARK 0xA5u             /* (pnl's last byte as saved: a panel is there) */
 #define NPCAB P23_CABLES
@@ -54,15 +57,13 @@ static uint8_t pnl[NPNL];
 static p23_cable pcab[NPCAB];
 static volatile int32_t fx_bpm10=1200;
 static volatile uint8_t pnl_run;   /* the transport: the INT clock runs with PLAY */
-static volatile uint8_t stut_ui;   /* (SHIFT + the STUTTER's key held: ui.c) */
-/* the STUTTER's RND settings: SLICE ST_SLC_RND, MODE ST_MODE_RND, RATE and DECAY ST_VAL_RND -- each press, a value
- * drawn for it (ui.c's stut_draw, into stut_pick: SLICE, RATE, MODE, DECAY) */
-#define ST_SLC_RND 6u
-#define ST_MODE_RND 4u
-#define ST_VAL_RND 128u
-static volatile uint8_t stut_pick[4];
+static volatile uint8_t xf_ui;     /* (SHIFT + TRANSFORM's key held: ui.c) */
+/* TRANSFORM's rows, each 0 for RND (drawn at each press), then: TRACKS 1 .. 4 two to five tracks, 5 all six; STACK
+ * 1 .. 5 effects; DEPTH, MIX 1 .. 101 for 0 .. 100. At first: ALL, 2, 60, 100 */
+#define XF_MARK 0x5Bu
+static p23_transform xf_now;       /* (as drawn at the press, ui.c's xf_draw) */
 static const uint8_t PNL0[NPN]={0,0,40,0,64,64,0,0, 0,0,40,64,50,0,0,90,90, 0,0,127,127,127,127,0,0,0,0,0,
-                                 0,0,0,1,1,1,1,1,1, 1,64,0,0,64,0,127, 0};
+                                 0,0,0,1,1,1,1,1,1, 5,2,61,101,0,0,0, 0, 0,XF_MARK};
 static void fx_cook_all(void) {} /* the panel is read whole at each block */
 static void fx_init(void)
 {
@@ -77,8 +78,10 @@ static void pnl_give(const uint8_t *p,const p23_cable *c)
     fx_init();
     if(p[NPNL-1u]!=PNL_MARK) return;
     memcpy(pnl,p,NPN);
-    if(!(pnl[PN_ST_RATE]|pnl[PN_ST_DRIFT]|pnl[PN_ST_MIX]))   /* (a session from before the STUTTER: its defaults) */
-        memcpy(pnl+PN_ST_SLICE,PNL0+PN_ST_SLICE,NPN-PN_ST_SLICE);
+    if(pnl[PN_XF_MARK]!=XF_MARK) {   /* (a session from before this TRANSFORM: its defaults, CTRL ALL kept) */
+        memcpy(pnl+PN_XF_TRACKS,PNL0+PN_XF_TRACKS,PN_CTRL_ALL-PN_XF_TRACKS);
+        pnl[PN_RES45]=0; pnl[PN_XF_MARK]=XF_MARK;
+    }
     for(i=0;i<NPCAB;i++) {
         pcab[i]=c[i];
         if(pcab[i].a>=P23_PINS || pcab[i].b>=P23_PINS || pcab[i].a==pcab[i].b) pcab[i].a=pcab[i].b=P23_PIN_NONE;
@@ -121,6 +124,27 @@ static void p23_from_frontend(const sound_t *s,p23_patch *p,uint32_t track)
         p->mod[j].depth=(int8_t)clampi(depth,-127,127);
     }
 }
+/* TRANSFORM's settings for a press: the page's, each RND drawn from seed r. have: the tracks with notes, taken first
+ * (then the others) for the tracks it changes. RND keeps to what is heard: 2 .. 4 effects, DEPTH 25 .. 100, MIX
+ * 50 .. 100 */
+static uint32_t xf_rnd(uint32_t *r,uint32_t n) { *r=*r*1664525u+1013904223u; return n?(*r>>16)%n:0u; }
+static uint8_t xf_pct(uint32_t v,uint32_t *r,uint32_t lo,uint32_t hi)
+{ return (uint8_t)(((v?v-1u:lo+xf_rnd(r,hi-lo+1u))*127u+50u)/100u); }
+static void xf_draw(uint32_t have,uint32_t r,p23_transform *x)
+{
+    uint32_t v=pnl[PN_XF_TRACKS],n=v==0?2u+xf_rnd(&r,5):v>=5u?6u:v+1u,t,pick=0,k;
+    uint8_t order[P23_TRACKS];
+    for(t=0;t<P23_TRACKS;t++) order[t]=(uint8_t)t;
+    for(t=P23_TRACKS-1u;t>0;t--) { uint32_t j=xf_rnd(&r,t+1u); uint8_t o=order[t]; order[t]=order[j]; order[j]=o; }
+    for(k=0;k<2u;k++)                  /* (the tracks with notes first, then the others) */
+        for(t=0;t<P23_TRACKS && n;t++) if(((have>>order[t])&1u)==(k==0u) && !((pick>>order[t])&1u)) { pick|=1u<<order[t]; n--; }
+    memset(x,0,sizeof *x);
+    x->tracks=(uint8_t)pick;
+    v=pnl[PN_XF_STACK]; x->stack=(uint8_t)(v?clampi((int32_t)v,1,5):2+(int32_t)xf_rnd(&r,3));
+    x->depth=xf_pct(pnl[PN_XF_DEPTH],&r,25,100);
+    x->mix=xf_pct(pnl[PN_XF_MIX],&r,50,100);
+    x->seed=r*2654435761u;
+}
 static void p23_global_from_frontend(void)
 {
     p23_panel g; uint32_t j;
@@ -141,14 +165,6 @@ static void p23_global_from_frontend(void)
         p23_set_cables(none);
     }
     for(j=0;j<P23_TRACKS;j++) p23_lr_mode(j,P23_LR_PLAY);
-    {   /* the STUTTER as its page sets it (a break's own may stand in for it: tracks.c mix_block) */
-        p23_stutter st;
-        st.slice=pnl[PN_ST_SLICE]>=ST_SLC_RND?stut_pick[0]:pnl[PN_ST_SLICE];
-        st.rate=pnl[PN_ST_RATE]>=ST_VAL_RND?stut_pick[1]:pnl[PN_ST_RATE];
-        st.mode=pnl[PN_ST_MODE]>=ST_MODE_RND?stut_pick[2]:pnl[PN_ST_MODE];
-        st.decay=pnl[PN_ST_DECAY]>=ST_VAL_RND?stut_pick[3]:pnl[PN_ST_DECAY];
-        st.drift=pnl[PN_ST_DRIFT]; st.roll=pnl[PN_ST_ROLL]; st.mix=pnl[PN_ST_MIX];
-        p23_set_stutter(&st);
-    }
+    p23_set_transform(&xf_now);   /* (TRANSFORM as drawn at the press; a break's own may stand in: tracks.c) */
     p23_lr_velocity(pnl[PN_LR_VEL]==2u,pnl[PN_LR_VEL]==1u);
 }
