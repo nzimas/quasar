@@ -1,0 +1,13 @@
+build/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
+# the project's instructions to coding agents: kept local
+AGENTS.md
+
+# Local research books and extracted copyrighted text (SOMA's manual, the Synthdawg notebook): never committed
+docs/reference/*.pdf
+docs/reference/*manual.txt
+docs/reference/*notebook.txt

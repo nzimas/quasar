@@ -1,0 +1,4062 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * The panel and the screen (after TONITOR's ui.c: its panel map, its bands, its dial, its scale page).
+ *
+ *   FX SEL ENV LFO EDIT GLO   the top row: tracks 1 to 6 (lit: the chosen one; the others glow while they sound)
+ *   PRESETS (knob)            the track's machine: 4-OP, DRUM, WAVY, HIVE (each track keeps a sound of
+ *                             each, so turning back finds it) -- on the track's view only: on the EDIT pages it moves
+ *                             through them, on the effects' pages the half shown
+ *   HOME                      a new sound for the track, on its machine (gen.c); SHIFT + HOME: of the same family
+ *   OCT- / OCT+               the track's octave, -3 .. +3; on the EDIT page, the page before / after; in the step
+ *                             view, the track's steps transposed a step of the scale (build 51); SHIFT: every track's
+ *   the white keys            play the track in the scale chosen (the first key the root, each the next degree)
+ *   the 1st black key         (the track's view, the step view off) CHORD mode on or off for the track (lit while
+ *                             on, dim off): each white key then plays a triad from its note, in the scale (after
+ *                             TONITOR's: TRIAD, INV 1, INV 2, SUS2, SUS4, OPEN, FOURTHS; in CHROMATIC as semitones);
+ *                             SHIFT and it, the next form (and on). The form shows at the top left. A step put in
+ *                             takes the chord last played; REC records chords into the steps, the looper their notes
+ *   the 2nd black key         (the track's view, the step view off) MUTE mode on or off (lit while on): the tracks'
+ *                             buttons, lit while playing and dim muted, mute or play a track as they are let go soon;
+ *                             held 1 s, that track alone plays (solo; held 1 s again, the mutes as they were before
+ *                             it). Off, the mutes stay (and the buttons choose
+ *                             tracks again); a muted track's number is dark. Kept with the session
+ *   the 3rd black key         (the step view off) BREAK while held (tracks.c): the chosen track's pattern broken up
+ *                             -- other steps played, ratchets, flams, leaps, a gap -- its position kept; SHIFT and
+ *                             it, every track. Let go, each plays on from where it is. The way shows in the band
+ *   the 5th black key         (the step view off) the track's arpeggiator on or off (tracks.c; lit while on): the keys
+ *                             held go to it, it plays them in turn (build 52); held 0.8 s: its page (ARP) up or down
+ *   the 6th black key         (the step view off; dim) SHIFT and it held: the STUTTER; held alone 0.8 s, its page
+ *   the 7th black key         (the step view off; in it, with SHIFT) PERFORMANCE on or off (lit while on): the state
+ *                             kept, given back as it goes off; meanwhile KNOB 1 .. 4 every track with notes (projects.c)
+ *   the rightmost black key   SHIFT
+ *   the 3rd black key from the right   STEP: the step view, on or off (lit while on). The white keys are the track's
+ *                             16 steps, silent (build 70): a key on an empty step puts the track's last note played
+ *                             there; a key on a step that holds a note, let go soon (0.4 s) and nothing changed,
+ *                             empties it. SHIFT + STEP: the chosen track's 16 steps emptied, with their locks (its
+ *                             length, clock, direction and loops kept), the view as it was. In the
+ *                             view the black keys, lit dimly:
+ *                               the 1st   a new phrase for the track (phrase.c): its steps, conditions and locks;
+ *                                         SHIFT and it: new locks on the steps the track holds, nothing else changed
+ *                                         Held 0.8 s: the PHRASE page, up or down: KNOB 1 the track's DENSITY, 2 its
+ *                                         COMPLEXITY (0 .. 100: how full its phrases; how many locks, conditions,
+ *                                         ratchets)
+ *                               the 2nd   the TRACK page, up or down: KNOB 1 the track's LENGTH (1 .. 16 steps),
+ *                                         KNOB 2 its CLOCK against the tempo's 16ths (1/8, 1/4, 1/2, 1X, 2X, 4X)
+ *                               the 3rd   TRIG on or off: on, a step held shows its own page -- KNOB 1 its note (in
+ *                                         the scale), 2 its velocity, 3 its length, 4 its trig condition; PRESETS
+ *                                         right, its other half: KNOB 1 its RATCHET (the step played 2 .. 8 times)
+ *                               the 4th   MOD on or off (TRIG off): on, a step held shows its MOD page -- KNOB 1
+ *                                         MUTATE (its note moved -N .. +N steps of the scale, or RND: at random up to
+ *                                         an octave either way), 2 MUT EVERY (every so many times the step plays), 3
+ *                                         MIDI FX, 4 FX EVERY
+ *                               the 6th .. 8th   the track's direction: REVERSE, PING-PONG, RANDOM (again: forward)
+ *                             A step held, TRIG off: the knobs lock what they set on the track's view on it (FREQ,
+ *                             RESO, the delay and reverb sends; SHIFT: chorus, overdrive), as a dial; SELECT locks its
+ *                             level, ALGORITHM its pan. With the EDIT pages up, the knobs lock what they turn on the
+ *                             step held -- any parameter of the sound, eight locks a step (the page shows the step's
+ *                             values: locked in the track's colour, the sound's own grey)
+ *                             SHIFT and a step held 0.8 s: the step copied (its note, velocity, length, condition,
+ *                             ratchet, locks; COPY S5 shows, its key blinks); SHIFT and another held 0.8 s: pasted
+ *                             there (this track or another); the same again, or the step view off: let go
+ *   PLAY                      the sequencer, as it is let go: plays, or stops (and recording ends, a loop being
+ *                             recorded is dropped). Held 0.8 s: the TEMPO page, up or down -- the session's tempo,
+ *                             large; PRESETS sets it (a track's button, or another page, takes it down too)
+ *   SHIFT + PLAY              the metronome off or on (it clicks while REC or the looper is armed or recording)
+ *   REC                       recording into the chosen track's steps. Stopped: armed (REC flashes, the metronome
+ *                             counts), the first note played starts the sequencer and is step 1. Playing: recording
+ *                             at once (punch in). Each note played goes to the nearest step, its velocity and its
+ *                             length (as held) with it, over what the step held; round and round until REC again
+ *                             (it plays on)
+ *   SHIFT + REC               the looper (after TONITOR's): a new loop on the chosen track, armed; the first note
+ *                             played starts it (and the sequencer, if stopped); every note played after is in it, at
+ *                             the nearest step, with its velocity and length, until REC ends it: its length the
+ *                             nearest whole bars (1 .. 32), it plays round and round in it, on from where it is, over
+ *                             the track's steps. Three loops a track
+ *   SHIFT + REC held          the track's loops on the first three white keys (lit: playing; dim: muted): a key let
+ *                             go soon mutes its loop or plays it again; held 0.8 s, empties it. Held 1.5 s with no
+ *                             white key touched: every loop of the track emptied
+ *   SHIFT + PRESETS           the track's sound: a new one of the family before / after, on the machine it plays
+ *   the black key before it   EDIT: the parameter pages of the track's sound -- SYN 1 .. 4, FLTR 1, FLTR 2, AMP,
+ *                             FX -- eight parameters a page: KNOB 1 .. 4 its A .. D, or (PRESETS turned right; left
+ *                             back) its E .. H; OCT- / OCT+ the page before / after
+ *   ARP                       the SCALE page: SELECT the root, ALGORITHM the scale; ARP again, back (Tonitor's).
+ *                             SHIFT + ARP: a scale and root at random, the SCALE page shown 1.5 s
+ *   SEQ                       the effects' pages: CHORUS, COMP (the master compressor), DELAY, REVERB in turn, then
+ *                             back (OCT- / OCT+ too; a track's button: back to its view; SHIFT and it, the track
+ *                             chosen, the page kept -- COMP's SC SOURCE and SC LEVEL are the chosen track's);
+ *                             KNOB 1 .. 4 the first four of the page, or (PRESETS turned right; left back) the next
+ *   SAVE                      the patterns (projects.c); held 0.8 s, the session saved -- never saved, the first
+ *                             empty slot's page, SAVE NEW? (YES chosen). SHIFT + SAVE: the sessions; held 0.8 s,
+ *                             GLOBAL SETUP (setup.c: MIDI). As Tonitor's, its snapshots the patterns (build 76)
+ *   SELECT (knob)             the track's level; ALGORITHM (knob) its pan
+ *   KNOB 1 .. 4               the track's filter FREQ and RESO, its delay and reverb sends; with SHIFT, KNOB 3 the
+ *                             chorus send and KNOB 4 the overdrive. While one turns (and a second after) the whole
+ *                             screen is its dial
+ *   USB MIDI notes            the chosen track, as the keys
+ *   MASTER                    the level
+ * The screen is for low vision: few words, very large, high contrast, each track its own colour. */
+
+enum { B_FX, B_SEL, B_ENV, B_LFO, B_EDIT, B_GLO, B_HOME, B_SAVE, B_ARP, B_SEQ, B_PLAY, B_REC, B_OCTDN, B_OCTUP, NB };
+enum { EN_SELECT, EN_ALGO, EN_PRESET, EN_K1, EN_K2, EN_K3, EN_K4, NE };
+static const uint8_t PANEL_BTN[NB] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0, 1};
+static const uint8_t PANEL_ENC[NE] = {0, 1, 6, 2, 3, 4, 5};
+static const uint8_t TRACK_BTN[NTRACK] = {B_FX, B_SEL, B_ENV, B_LFO, B_EDIT, B_GLO};
+static const uint8_t KNOB[4] = {EN_K1, EN_K2, EN_K3, EN_K4};
+#define NKEY 27u
+#define KEY_SHIFT 25u
+#define KEY_EDIT 22u
+#define KEY_STEP 20u                 /* (the 3rd black key from the right) */
+#define KEY_GEN 1u                   /* (the 1st black key from the left: in the step view, a new phrase) */
+#define KEY_TRK 3u                   /* (the 2nd: in the step view, the TRACK page) */
+#define KEY_TRIG 5u                  /* (the 3rd: TRIG, the step held's own page) */
+#define KEY_MOD 8u                   /* (the 4th: MOD, the step held's MUTATE and MIDI FX) */
+#define KEY_ARP 10u                  /* (the 5th: out of the step view, the track's arpeggiator; build 52) */
+#define KEY_STUT 13u                 /* (the 6th: out of the step view, the STUTTER -- SHIFT and it held: it plays; held
+                                      * alone 0.8 s, its page) */
+#define KEY_PERF 15u                 /* (the 7th: PERFORMANCE on or off -- in the step view, with SHIFT) */
+static const uint8_t KEY_DIR[3] = {13, 15, 17};  /* (the 6th .. 8th: REVERSE, PING-PONG, RANDOM) */
+static const char *const DIR_NAME[NDIR] = {"FORWARD", "REVERSE", "PING-PONG", "RANDOM"};
+#define SHOWN_DIAL 30u               /* (ui.shown_page: the dial up; the step's own page) */
+#define SHOWN_STEP 31u
+#define KEY_NONE 0xFFu
+
+static const uint16_t TRACK_COL[NTRACK] = {RGB(255, 214, 0), RGB(0, 214, 255), RGB(255, 92, 210),
+                                           RGB(96, 255, 96), RGB(255, 140, 0), RGB(190, 160, 255)};
+enum { PG_MAIN, PG_EDIT, PG_FXP, PG_TRK, PG_GEN, PG_TEMPO, PG_SCALE, PG_PRJ, PG_PRJD, PG_PAT, PG_SET };   /* (the sessions' list and page, the patterns' grid:
+                                                              * projects.c) */
+
+static struct {
+    uint8_t sel;
+    uint8_t sub[NTRACK];         /* each track's subtrack chosen (0 ST-A; a DRUM track's B .. D: build 79) .. */
+    uint8_t sl;                  /* .. and the lane chosen: the chosen track's subtrack (sel_sync) */
+    uint8_t page;
+    uint8_t edit_pg;             /* the EDIT page shown (0 .. pages_n - 1) */
+    uint8_t fx_pg;               /* the effect shown: FXP_* (CHORUS, COMP, DELAY, REVERB) */
+    uint8_t half;                /* the half of the page shown: 0 A .. D, 1 E .. H (the pages': ehalf; else SHIFT held) */
+    uint8_t ehalf;               /* the EDIT and effects pages' half, set by PRESETS */
+    int8_t oct[NLANE];           /* (a lane's, as the levels and pans, the steps' notes and phrases below) */
+    uint8_t eng[NTRACK];
+    sound_t snd[NTRACK][NENG];
+    uint8_t dirty[NLANE];        /* the sound changed: to be published (a lane's) */
+    uint8_t key_track[NKEY], key_note[NKEY];
+    uint8_t key_cn[NKEY][3];     /* a key down: the notes it sounds (its chord's three; a note: it alone) */
+    uint8_t key_arp[NKEY];       /* .. given to its track's arpeggiator, not sounded (build 52) */
+    uint8_t last_note[NLANE];    /* the note last played on each lane (0: none yet): what a step is given */
+    uint8_t last_chf[NLANE];    /* .. and its chord (form + 1; 0: a note alone) */
+    uint8_t chord_on[NTRACK], chord_form[NTRACK];   /* each track's CHORD mode, and its form (CH_*) */
+    uint8_t mute_mode;           /* MUTE mode (the 2nd black key): the tracks' buttons mute, held 1 s solo (build 35) */
+    uint8_t brk, brk_shown;      /* BREAK (the 3rd black key held): the tracks under it; the way last said (build 37) */
+    uint8_t learn, lsel, listen; /* MIDI LEARN (the 4th black key, build 48): on; the row chosen on the page (0 .. 7);
+                                  * waiting for a CC for it */
+    uint8_t learn_dirty;         /* (bindings changed: written as MIDI LEARN goes off) */
+    uint8_t tb_down, tb_long;    /* .. a track's button held (a bit each), held long enough: soloed */
+    uint8_t solo;                /* .. the track soloed (0xFF none), and the mutes before it (a bit each: held again,
+                                  * they come back) */
+    uint8_t pre_solo;
+    uint32_t tb_t0[NTRACK];
+    uint8_t step_key;            /* SHIFT: the key of the step held (KEY_NONE none) */
+    uint8_t step_new, step_edit;     /* .. its note put there as it was pressed; changed since */
+    uint32_t step_t0;            /* .. pressed at */
+    uint8_t sv;                  /* the step view on (STEP) */
+    uint32_t gen_until;          /* the phrase key lit fully until */
+    uint8_t gen_down, gen_long, gen_sh;   /* the phrase key held: since gen_t0; held 0.8 s (its page); SHIFT with it */
+    uint32_t gen_t0;
+    uint8_t stk_down, stk_long, stk_on;   /* the STUTTER's key (the 6th black key) held: since stk_t0; its page
+                                  * shown; SHIFT with it: stuttering */
+    uint32_t stk_t0;
+    uint8_t ak_down, ak_long;    /* the 5th black key (the arpeggiator's) held: since ak_t0; held 0.8 s (its page;
+                                  * build 53) */
+    uint32_t ak_t0;
+    int8_t trn[NLANE];           /* each lane's transposition in the pattern playing, steps of the scale (build 51) */
+    uint8_t gen_den[NLANE], gen_cx[NLANE];   /* the phrase generator's DENSITY and COMPLEXITY, 0 .. 100, a track's */
+    uint8_t trig;                /* TRIG on (the 3rd black key): a step held shows its own page */
+    uint8_t mod;                 /* MOD on (the 4th): a step held shows its MOD page */
+    uint8_t play_down, play_long;   /* PLAY held: since play_t0; held 0.8 s (the TEMPO page) */
+    uint32_t play_t0;
+    uint8_t sk, sk_long;         /* SHIFT and a step key held (KEY_NONE none): since sk_t0; held 0.8 s */
+    uint32_t sk_t0;
+    struct {                     /* a step copied (SHIFT + a step held): from where, and all it held */
+        uint8_t on, t, i, note, vel, glen, cond, rtg, lid[NPL], mcy, mfx, fcy, chf;
+        int8_t mut;
+        int16_t lv[NPL];
+    } sclip;
+    uint8_t qk, qk_long;         /* the PATTERNS grid: the white key held (KEY_NONE none); held 0.8 s, the pattern
+                                  * playing saved there (SHIFT: copied); SHIFT and the 1st black key held, pressed, emptied */
+    uint8_t rec;                 /* REC_* */
+    uint8_t click;               /* the metronome while recording */
+    uint8_t lrec;                /* the looper: 0 off, 1 armed, 2 recording */
+    uint8_t lt, ll;              /* .. the track and the loop it records */
+    uint32_t lstart;             /* .. the step its first note went to (seq_gcount's count) */
+    uint8_t lrec_down, lview;    /* SHIFT + REC held: on release, armed -- unless the loops were shown (lview) */
+    uint8_t lv_any;              /* .. a white key touched, or the loops emptied, while it was held */
+    uint32_t lrec_t0;
+    uint8_t lv_k, lv_long;       /* the loops shown: the white key held, held 0.8 s */
+    uint32_t lv_t0;
+    uint16_t lk_ev[NKEY];        /* a key held as the looper recorded it: its note in the loop (0xFFFF none) .. */
+    uint8_t lk_n[NKEY];          /* .. how many (a chord: three, one after the other) */
+    uint32_t lk_t0[NKEY];        /* .. and when it was pressed */
+    uint8_t rec_step[NKEY], rec_tr[NKEY];   /* a key held as it was recorded: its step (0xFF none) and track .. */
+    uint32_t rec_t0[NKEY];       /* .. and when it was pressed */
+    uint32_t qk_t0;
+    uint8_t midi_track[128];     /* each note received: the tracks playing it (a bit each; build 46) */
+    uint32_t keys;
+    char msg[16];
+    uint32_t msg_until, home_until;
+    uint32_t home_t0, ssv_t0, save_t0;   /* HOME, SHIFT + SAVE, SAVE pressed at (held 0.8 s; let go sooner: a press) */
+    uint8_t home_down, home_long, ssv_down, ssv_long, save_down, save_long;
+    uint32_t seed;
+    uint8_t scale, root;
+    int16_t tempo;               /* the project's, BPM */
+    int8_t level[NLANE], pan[NLANE];
+    int8_t touched;              /* the row just turned (-1 none), until touch_until */
+    uint32_t touch_until;
+    uint32_t sc_peek_until;      /* the SCALE page shown over any page until then (SHIFT + ARP) */
+    uint8_t dial_pg, dial_j;     /* the dial: the parameter it shows (page id, index) */
+    uint8_t dial_lk, dial_step;  /* .. or a step's lock (its id + 1, 0 none) and the step */
+    uint32_t dial_until, dial_drawn_at;
+    int32_t shown_dial;
+    uint32_t flash_t0;
+    uint8_t flash_on, flash_phase;
+    uint16_t flash_col;
+    char flash_l1[12], flash_l2[12];
+    /* the screen as last drawn */
+    int32_t shown_sel, shown_eng, shown_msg, shown_meter, shown_level, shown_pan, shown_mac;
+    char shown_text[16];
+    int32_t shown_rows[4];
+    uint8_t shown_step;          /* (the EDIT page: the step held it showed, 0xFF none) */
+    int8_t shown_touch;
+    uint8_t shown_page, shown_half, shown_sub, shown_learn;
+    int32_t shown_prj;           /* (the pattern shown at the top left, its changes, the octave and chord) */
+    int32_t shown_batt;          /* (the battery shown: its level, USB power) */
+    uint32_t meter_at;
+    uint8_t force;
+} ui;
+
+/* the DUCK page's rows: the chosen track's sidechain (SC SOURCE, SC LEVEL: in its colour) */
+static const char *const CPN[2] = {"SC SOURCE", "SC LEVEL"};
+#define CMP_SRC 0xFEu
+#define CMP_LVL 0xFFu
+static const uint8_t CMP_SLOT[2] = {CMP_SRC, CMP_LVL};
+static uint16_t row_tint;                        /* (draw_row: a row's name and value in this colour, 0 none) */
+static uint8_t row_learn;                        /* (draw_row: MIDI LEARN's -- the value a CC's, amber, no bar) */
+#define C_LEARN RGB(255, 170, 40)                /* (a CC number, not a value) */
+#define C_LEARN_ON RGB(170, 70, 0)               /* (.. on the chosen row's white) */
+/* SEQ: the Pulsar panel's pages in turn (the looper-recorder, SHAOS, the LFO, the FX processor, the mix
+ * and distortion, the attenuators, the touch and MIDI CVs, the patchbay), then the chosen track's DUCK and its
+ * three automation LFOs (Bigorna's, the sound's) */
+enum { FXP_CLK, FXP_LR,   /* (FXP_CLK: kept for the numbering MIDI LEARN saves, never shown -- the clock follows the tempo) */
+        FXP_SH, FXP_LFOP, FXP_FX, FXP_MIX, FXP_STUT, FXP_CV, FXP_PATCH, FXP_CMP, FXP_L1, FXP_L2, FXP_L3,
+       NFXP };
+#define FXP_ARP NFXP                             /* (the chosen track's arpeggiator: SHIFT + the 5th black key, not in
+                                                  * SEQ's turn; build 52) */
+static const char *const FXT[NFXP + 1] = {"CLOCK", "LOOPER", "SHAOS", "LFO", "FX", "MIX", "STUTTER", "CV", "PATCH",
+                                         "DUCK", "AUTO 1", "AUTO 2", "AUTO 3", "ARP"};
+/* a panel page's row: its name, its byte in pnl[] (PN_*; PNR_*: an action), and a list (n names) or 0 .. 127 */
+typedef struct { const char *name; uint8_t idx, n; const char *const *list; } pnr_t;
+enum { PNR_RUN = 0xF0u, PNR_QUANT, PNR_CLEAR, PNR_LRMODE, PNR_NONE = 0xFFu };
+static const char *const PL_CLK[3] = {"INT", "EXT", "STOP"};
+static const char *const PL_SHL[3] = {"63", "16", "217"};
+static const char *const PL_RNG[3] = {"LOW", "MID", "HI"};
+static const char *const PL_FXM[3] = {"BPF", "DBL", "PCH"};
+static const char *const PL_FXR[2] = {"DLY", "REV"};
+static const char *const PL_OFFON[2] = {"OFF", "ON"};
+static const char *const PL_LRM[3] = {"MUTE", "PLAY", "REC"};
+static const char *const PL_VEL[3] = {"H", "M", "L"};
+static const char *const PL_BANK[4] = {"1", "2", "3", "4"};
+static const char *const PL_RUN[9] = {"STOP", "1", "2", "3", "4", "5", "6", "7", "8"};
+static const char *const PL_GO[2] = {"-", "GO"};
+static const char *const PL_SLC[7] = {"1/32", "1/16", "1/8", "1/4", "1/16T", "1/8T", "RND"};   /* (RND, and MODE's: each
+                                                  * press its own -- engine_control.c's stut_pick) */
+static const char *const PL_STM[5] = {"FWD", "REV", "ALT", "WILD", "RND"};   /* (WILD: each pass its own direction and
+                                                  * speed, the engine's P23_ST_RND) */
+#define PR(nm, i) {nm, i, 0, 0}
+#define PRL(nm, i, n, l) {nm, i, n, l}
+#define PR0 {"", PNR_NONE, 0, 0}
+static const pnr_t PNR[FXP_PATCH][8] = {
+    {PRL("SOURCE", PN_CLK_SRC, 3, PL_CLK), PR("MOD AMT", PN_CLK_AMT), PR0, PR0, PR0, PR0, PR0, PR0},
+    {PRL("MODE", PNR_LRMODE, 3, PL_LRM), PRL("BANK", PN_LR_BANK, 4, PL_BANK), PRL("VELOCITY", PN_LR_VEL, 3, PL_VEL),
+     PRL("START", PNR_RUN, 9, PL_RUN), PRL("QUANTIZE", PNR_QUANT, 2, PL_GO), PRL("CLEAR", PNR_CLEAR, 2, PL_GO), PR0, PR0},
+    {PR("FREQ", PN_SH_FREQ), PRL("LENGTH", PN_SH_LEN, 3, PL_SHL), PR0, PR0, PR0, PR0, PR0, PR0},
+    {PR("FREQ", PN_LFO_FREQ), PR("SHAPE", PN_LFO_SHAPE), PRL("RANGE", PN_LFO_RANGE, 3, PL_RNG), PR("MOD AMT", PN_LFO_AMT),
+     PR0, PR0, PR0, PR0},
+    {PRL("MODE", PN_FX_MODE, 3, PL_FXM), PRL("FX TO", PN_FX_ROUTE, 2, PL_FXR), PR("TIME", PN_FX_TIME), PR("TUNE", PN_FX_TUNE),
+     PR("FB", PN_FX_FB), PR("CLK MOD", PN_FX_CLK), PRL("MAD!", PN_FX_MAD, 2, PL_OFFON), PR0},
+    {PR("DLY OUT", PN_DLY_OUT), PR("REV OUT", PN_REV_OUT), PR("DRIVE", PN_DRIVE), PR("DIST MIX", PN_DMIX),
+     PR0, PR0, PR0, PR0},
+    {PRL("SLICE", PN_ST_SLICE, 7, PL_SLC), PR("RATE", PN_ST_RATE), PRL("MODE", PN_ST_MODE, 5, PL_STM), PR("DECAY", PN_ST_DECAY),
+     PR("DRIFT", PN_ST_DRIFT), PR("ROLL", PN_ST_ROLL), PR("MIX", PN_ST_MIX), PR0},   /* (the STUTTER: in the ATTEN page's place) */
+    {PR("TOUCH 1", PN_TOUCH1), PR("TOUCH 2", PN_TOUCH2), PR0, PR0, PR("MIDI CV 1", PN_MCV1), PR("MIDI CV 2", PN_MCV2),
+     PR("MIDI CV 3", PN_MCV3), PR("MIDI CV 4", PN_MCV4)},
+};
+#undef PR
+#undef PRL
+#undef PR0
+static uint8_t ui_lr_run = 1;                    /* (the looper's START row: STOP, or the eighth it started from) */
+static uint8_t pch_slot;                         /* (the PATCH page: the cable chosen, 0 .. 31) */
+static const char *const ARN[NARP] = {"MODE", "RATE", "RANGE", "GATE", "LATCH", "DENSITY", "OCT RND", "BASS"};
+static const char *const AMN[NAM] = {"UP", "DOWN", "UP DOWN", "DOWN UP", "ORDER", "RANDOM", "CONVERGE", "DIVERGE",
+                                     "PINKY", "THUMB"};
+static const char *const ARATE[NAR_RATE] = {"1/32", "1/16T", "1/16", "1/8T", "1/8", "1/4"};
+/* an LFO page's rows, as lfo_t's fields */
+enum { LF_SPD, LF_MULT, LF_FADE, LF_DEST, LF_WAVE, LF_SPH, LF_MODE, LF_DEP, NLF };
+static const char *const LFN[NLF] = {"SPEED", "MULT", "FADE", "DEST", "WAVE", "START", "MODE", "DEPTH"};
+static const char *const LWN[NLW] = {"TRI", "SINE", "SQR", "SAW", "EXP", "RAMP", "RND"};
+static const char *const LMN[NLM] = {"FREE", "TRIG", "HOLD", "ONE", "HALF"};
+#define C_SEND RGB(140, 190, 255)
+#define C_OK RGB(60, 220, 90)
+#define C_BAD RGB(255, 40, 40)
+/* projects.c (after this file) */
+static uint8_t prj_dirty, pat_cur, pat_dirty;
+static int8_t prj_cur;
+static void prj_press(int sh);
+static void pat_save_cursor(void);
+static void prj_preset(int32_t s);
+static void prj_draw(void);
+static void prj_quick_save(void);
+static void setup_open(void);          /* (setup.c: GLOBAL SETUP) */
+static void setup_press(int sh);
+static void setup_preset(int32_t s);
+static void setup_draw(void);
+static void setup_poll(void);
+static void midi_cc_in(uint32_t t, uint32_t cc, uint32_t v);
+static void setup_write(void);
+static int learn_cc(uint32_t ch, uint32_t cc, uint32_t v);
+static void learn_take(uint32_t ch, uint32_t cc);
+static void learn_toggle(void);
+static void learn_save(int sh);
+static void midi_poll(void);
+static void pat_switch(uint32_t k);
+static void phrase_brk_roles(void);   /* (phrase.c: BREAK's kicks, drums and drones, from the tracks' sounds) */
+static void pat_switch(uint32_t k);
+static void pat_copy_hold(uint32_t k);
+static void pat_brk_save(uint32_t k);
+static void pat_save_as(uint32_t k);
+static void pat_grid_open(void);
+static void pat_poll(void);
+static uint8_t seq_pend_k;                       /* (projects.c: the pattern waiting to play) */
+static void tempo_apply(void);
+static int8_t pat_clip_from;                     /* (projects.c: the pattern copied, -1 none) */
+static void pat_clear(uint32_t k);
+static void prj_grid_open(void);                 /* (projects.c: the SESSIONS grid, and its white keys) */
+static void prj_key_load(uint32_t w);
+static void prj_key_save(uint32_t w);
+static int prj_key_lit(uint32_t w);
+static int perf_enter(void);                     /* (projects.c: PERFORMANCE's keeping and giving back) */
+static void perf_exit(void);
+static uint8_t perf_on;                          /* PERFORMANCE (the 7th black key) on: what changes, given back as it
+                                                  * goes off */
+static void phrase_new(uint32_t t);              /* (phrase.c) */
+static void phrase_relock(uint32_t t);
+static int snd_kick(const sound_t *s);          /* (phrase.c: a kick's sound) */
+static int pg_any(void) { return ui.page >= PG_PRJ; }   /* a projects' or patterns' page */
+
+static void say(const char *s, uint32_t ms)
+{
+    str_cpy(ui.msg, s, sizeof ui.msg);
+    ui.msg_until = fm1_ms + ms;
+}
+static void flash(const char *l1, const char *l2, uint16_t c)
+{
+    str_cpy(ui.flash_l1, l1, sizeof ui.flash_l1);
+    str_cpy(ui.flash_l2, l2, sizeof ui.flash_l2);
+    ui.flash_col = c;
+    ui.flash_t0 = fm1_ms;
+    ui.flash_on = 1;
+    ui.flash_phase = 0xFF;
+}
+/* (build 79) the lanes: a track's own sound is ui.snd's, a shared lane's (a subtrack ST-B .. ST-D) its own */
+static sound_t ui_lsnd[NXL] POOL;
+static sound_t *lane_snd(uint32_t l) { return l < NTRACK ? &ui.snd[l][ui.eng[l]] : &ui_lsnd[l - NTRACK]; }
+static int trk_lanes(uint32_t t) { (void)t; return 0; }   /* (Pulsar23: no subtracks, on any track) */
+static void sel_sync(void)                       /* (the lane chosen: the chosen track's subtrack, while it has them) */
+{
+    uint32_t l = ui.sel;
+    if (trk_lanes(ui.sel) && ui.sub[ui.sel]) {
+        l = lane_find(ui.sel, ui.sub[ui.sel]);
+        if (l >= NLANE) {
+            ui.sub[ui.sel] = 0;
+            l = ui.sel;
+        }
+    }
+    ui.sl = (uint8_t)l;
+}
+/* (build 80) a sidechain's source: one lane -- SC SOURCE's track, its subtrack chosen (T1-B), or by default its kick
+ * (the first of its subtracks whose sound is a kick; none: ST-A) */
+static uint32_t sc_kick(uint32_t u)
+{
+    uint32_t s;
+    for (s = 0; trk_lanes(u) && s < NSUB; s++) {
+        uint32_t l = lane_find(u, s);
+        if (l < NLANE && ln_on[l] && snd_kick(lane_snd(l)))
+            return l;
+    }
+    return u;
+}
+static uint32_t sc_lane(uint32_t t)              /* (track t's source lane; 0xFF none) */
+{
+    uint32_t src = sc_src[t], l;
+    if (!src || src > NTRACK)
+        return 0xFFu;
+    if (sc_sub[t] && trk_lanes(src - 1u) && (l = lane_find(src - 1u, sc_sub[t] - 1u)) < NLANE && ln_on[l])
+        return l;
+    return sc_kick(src - 1u);
+}
+static int trk_has_subs(uint32_t u)              /* (a DRUM track with a subtrack past ST-A taken) */
+{
+    uint32_t s;
+    for (s = 1; trk_lanes(u) && s < NSUB; s++)
+        if (lane_find(u, s) < NLANE)
+            return 1;
+    return 0;
+}
+/* SC SOURCE's list: OFF, then each track -- one with subtracks as each of them, T1-A .. T1-D; entry i: its track + 1
+ * (0 OFF) and subtrack + 1 (0: a track without them) */
+static uint32_t sc_entries(uint8_t *src, uint8_t *sb)
+{
+    uint32_t n = 0, u, s;
+    src[n] = 0;
+    sb[n++] = 0;
+    for (u = 0; u < NTRACK; u++) {
+        if (!trk_has_subs(u)) {
+            src[n] = (uint8_t)(u + 1u);
+            sb[n++] = 0;
+            continue;
+        }
+        for (s = 0; s < NSUB; s++)
+            if (lane_find(u, s) < NLANE) {
+                src[n] = (uint8_t)(u + 1u);
+                sb[n++] = (uint8_t)(s + 1u);
+            }
+    }
+    return n;
+}
+static uint32_t sc_get(uint32_t t)               /* (track t's SC SOURCE: its entry -- a kick found: its subtrack's) */
+{
+    uint8_t src[NTRACK * NSUB + 1u], sb[NTRACK * NSUB + 1u];
+    uint32_t n = sc_entries(src, sb), i, l = sc_lane(t), want;
+    if (!sc_src[t])
+        return 0;
+    want = trk_has_subs(sc_src[t] - 1u) && l < NLANE ? LANE_S(l) + 1u : 0u;
+    for (i = 1; i < n; i++)
+        if (src[i] == sc_src[t] && sb[i] == want)
+            return i;
+    return 0;
+}
+static void sc_put(uint32_t t, uint32_t i)
+{
+    uint8_t src[NTRACK * NSUB + 1u], sb[NTRACK * NSUB + 1u];
+    uint32_t n = sc_entries(src, sb);
+    if (i >= n)
+        i = n - 1u;
+    sc_src[t] = src[i];
+    sc_sub[t] = sb[i];
+}
+static void sc_name(uint32_t i, char *b)         /* (entry i's name: OFF, T3, T1-B) */
+{
+    uint8_t src[NTRACK * NSUB + 1u], sb[NTRACK * NSUB + 1u];
+    uint32_t n = sc_entries(src, sb);
+    if (i >= n || !src[i]) {
+        str_cpy(b, "OFF", 4);
+        return;
+    }
+    b[0] = 'T';
+    b[1] = (char)('0' + src[i]);
+    b[2] = 0;
+    if (sb[i]) {
+        b[2] = '-';
+        b[3] = (char)('A' + sb[i] - 1u);
+        b[4] = 0;
+    }
+}
+static void sc_apply(void)                       /* (each sidechain's source lane for the audio, as the subtracks are now:
+                                                  * each pass) */
+{
+    uint32_t t;
+    for (t = 0; t < NTRACK; t++)
+        sc_ln[t] = (uint8_t)sc_lane(t);
+}
+static sound_t *cur(void)                        /* (the chosen sound: the chosen track's subtrack's) */
+{
+    sel_sync();
+    return lane_snd(ui.sl);
+}
+static uint32_t trk_lane(uint32_t t)             /* (track t's subtrack chosen: its lane) */
+{
+    uint32_t l = trk_lanes(t) && ui.sub[t] ? lane_find(t, ui.sub[t]) : t;
+    return l < NLANE ? l : t;
+}
+static void trk_note_off(uint32_t t, uint32_t note)   /* (a note let go on track t: on each of its lanes -- the subtrack
+                                                  * may have changed since it was struck) */
+{
+    uint32_t l;
+    for (l = t; l < NLANE; l = l < NTRACK ? NTRACK : l + 1u)
+        if (l < NTRACK || (ln_s[l] && ln_t[l] == t))
+            ev_post(arp_on[t] ? EV_ARP_OFF : EV_OFF, l, note, 0);
+}
+
+/* ------------------------------------------------------------ notes --- */
+#define LEVEL_MAX 23
+#define LEVEL_UNITY 20
+#define PAN_MAX 20
+static const int8_t PAN_DEF[NTRACK] = {0, 6, -6, 10, -10, 3};
+#define NSCALE 24                /* (new ones at the end: sessions keep the number; after TONITOR's list) */
+static const char *const SCALE_L1[NSCALE] = {"CHROMATIC", "MAJOR", "MINOR", "MINOR", "DORIAN", "PHRYGIAN", "MINOR",
+    "MAJOR", "WHOLE", "JAPANESE", "MINOR", "ENIGMATIC", "LYDIAN", "MIXOLYDIAN", "LOCRIAN", "BLUES", "HUNGARIAN",
+    "DOUBLE", "PHRYGIAN", "JAPANESE", "JAPANESE", "PELOG", "OCTATONIC", "PROMETHEUS"};
+static const char *const SCALE_L2[NSCALE] = {"", "", "NATURAL", "HARMONIC", "", "", "PENTA", "PENTA", "TONE", "IN",
+    "MELODIC", "", "", "", "", "", "MINOR", "HARMONIC", "DOMINANT", "HIRAJOSHI", "IWATO", "", "", ""};
+static const uint8_t SCALE_N[NSCALE] = {12, 7, 7, 7, 7, 7, 5, 5, 6, 5, 7, 7, 7, 7, 7, 6, 7, 7, 7, 5, 5, 5, 8, 6};
+static const uint8_t SCALE_STEP[NSCALE][12] = {
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+    {0, 2, 4, 5, 7, 9, 11}, {0, 2, 3, 5, 7, 8, 10}, {0, 2, 3, 5, 7, 8, 11}, {0, 2, 3, 5, 7, 9, 10},
+    {0, 1, 3, 5, 7, 8, 10}, {0, 3, 5, 7, 10}, {0, 2, 4, 7, 9}, {0, 2, 4, 6, 8, 10}, {0, 1, 5, 7, 8},
+    {0, 2, 3, 5, 7, 9, 11},      /* melodic minor (rising) */
+    {0, 1, 4, 6, 8, 10, 11},     /* enigmatic */
+    {0, 2, 4, 6, 7, 9, 11},      /* lydian */
+    {0, 2, 4, 5, 7, 9, 10},      /* mixolydian */
+    {0, 1, 3, 5, 6, 8, 10},      /* locrian */
+    {0, 3, 5, 6, 7, 10},         /* blues */
+    {0, 2, 3, 6, 7, 8, 11},      /* hungarian minor */
+    {0, 1, 4, 5, 7, 8, 11},      /* double harmonic */
+    {0, 1, 4, 5, 7, 8, 10},      /* phrygian dominant */
+    {0, 2, 3, 7, 8},             /* hirajoshi */
+    {0, 1, 5, 6, 10},            /* iwato */
+    {0, 1, 3, 7, 8},             /* pelog (selisir), in equal temperament */
+    {0, 1, 3, 4, 6, 7, 9, 10},   /* octatonic, half step first */
+    {0, 2, 4, 6, 9, 10},         /* prometheus */
+};
+static const char *const NOTE_NAME[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+#define SCALE_BASE 48
+static int32_t white_ix(uint32_t k)
+{
+    static const int8_t W[12] = {0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6};
+    uint32_t n = 53u + k, o = n / 12u;
+    int32_t w = W[n % 12u];
+    if (w < 0)
+        return -1;
+    return (int32_t)o * 7 + w - (4 * 7 + 3);
+}
+/* the note key k plays: in CHROMATIC, the key's own (moved by the root); else white key w the scale's degree */
+static uint32_t key_note(uint32_t k, int32_t oct)
+{
+    int32_t w, n, q;
+    if (ui.scale == 0)
+        return (uint32_t)clampi(53 + (int32_t)k + ui.root - 5 + 12 * oct, 12, 120);
+    w = white_ix(k);
+    n = SCALE_N[ui.scale];
+    q = w >= 0 ? w / n : -((n - 1 - w) / n);
+    return (uint32_t)clampi(SCALE_BASE + ui.root + 12 * oct + 12 * q + SCALE_STEP[ui.scale][w - q * n], 12, 120);
+}
+static int step_view(void);
+static int key_plays(uint32_t k)
+{
+    return k != KEY_SHIFT && k != KEY_EDIT && k != KEY_STEP &&
+           ((k != KEY_GEN && k != KEY_TRK && k != KEY_TRIG && k != KEY_MOD && k != KEY_ARP && k != KEY_STUT &&
+             k != KEY_PERF) || step_view()) &&
+           /* (out of the step view the 1st black key is CHORD mode's, the 2nd MUTE mode's, the 3rd BREAK, the 4th
+            * MIDI LEARN) */
+           (ui.scale == 0 || white_ix(k) >= 0);
+}
+/* a note in the scale (and the root); the next one up or down from n, d times */
+static int in_scale(int32_t n)
+{
+    uint32_t i, d = (uint32_t)(n - ui.root + 120) % 12u;
+    for (i = 0; i < SCALE_N[ui.scale]; i++)
+        if (SCALE_STEP[ui.scale][i] == d)
+            return 1;
+    return 0;
+}
+static int32_t scale_move(int32_t n, int32_t d)
+{
+    int32_t u = d > 0 ? 1 : -1, m;
+    for (; d; d -= u) {
+        for (m = n + u; m >= 12 && m <= 120 && !in_scale(m); m += u)
+            ;
+        if (m < 12 || m > 120)
+            break;
+        n = m;
+    }
+    return n;
+}
+/* transposition (build 51): track t's steps moved d steps of the scale (CHROMATIC: semitones), each note to the
+ * scale's next; TRN counts how far, kept with the pattern. Its loops too (build 54), each note the same way -- not
+ * the one being recorded -- kept with the session (from build 68 played so, kept as recorded: lp_trn) */
+#define TRN_MAX 24
+/* (build 67) a pattern given, its transpositions to[]: its loops played so (tracks.c's lp_trn; build 73: each loop
+ * its own pattern's, kept at its own ref) */
+static void lp_follow(const int8_t *to)
+{
+    uint32_t t;
+    for (t = 0; t < NTRACK; t++)
+        lp_trn[t] = to[t];
+}
+static int32_t trn_track(uint32_t t, int32_t d)   /* (t a lane: a subtrack's own steps) */
+{
+    int32_t v = clampi(ui.trn[t] + d, -TRN_MAX, TRN_MAX);
+    uint32_t i;
+    d = v - ui.trn[t];
+    if (!d)
+        return 0;
+    for (i = 0; i < NSTEP; i++)
+        if (seq_note[t][i])
+            seq_note[t][i] = (uint8_t)scale_move((int32_t)seq_note[t][i], d);
+    ui.trn[t] = (int8_t)v;
+    if (t < NTRACK)                              /* (its loops played so: build 68 -- the track's own lane's) */
+        lp_trn[t] = (int8_t)v;
+    for (i = 0; i < NLOOP; i++)
+        if (lp_get(t, i))
+            prj_dirty = 1;
+    pat_dirty = 1;
+    return d;
+}
+static void trn_text(char *b, int32_t v)          /* +2, -1, 0 */
+{
+    str_cpy(b, v > 0 ? "+" : "", 2);
+    fmt_int(b + str_len(b), v);
+}
+static int step_view(void) { return ui.sv; }
+static int step_held(void) { return ui.sv && ui.step_key != KEY_NONE; }
+/* the step's own page (NOTE, VEL, LEN, COND), while a step is held and the EDIT pages are not up */
+static int step_page(void)
+{
+    return step_held() && (ui.trig || ui.mod) && ui.page != PG_EDIT && ui.page != PG_TRK && ui.page != PG_GEN;
+}
+
+/* the steps' locks (the sequencer's, tracks.c): a lock is a parameter (page x 8 + knob; PL_PAN) and its value */
+static int pl_find(uint32_t t, uint32_t i, uint32_t id)
+{
+    uint32_t j;
+    for (j = 0; j < NPL; j++)
+        if (seq_lid[t][i][j] == id)
+            return (int)j;
+    return -1;
+}
+static int pl_set(uint32_t t, uint32_t i, uint32_t id, int32_t v)   /* 0; -1 the step's eight places taken */
+{
+    int j = pl_find(t, i, id);
+    if (j < 0)
+        j = pl_find(t, i, PL_NONE);
+    if (j < 0)
+        return -1;
+    seq_lv[t][i][j] = (int16_t)v;
+    RING_PUBLISH();
+    seq_lid[t][i][j] = (uint8_t)id;
+    return 0;
+}
+static void pl_clear(uint32_t t, uint32_t i)
+{
+    uint32_t j;
+    for (j = 0; j < NPL; j++)
+        seq_lid[t][i][j] = PL_NONE;
+}
+static void steps_clear(uint32_t t)               /* track t's steps emptied: notes, what they held, their locks */
+{
+    uint32_t i;
+    for (i = 0; i < NSTEP; i++) {
+        seq_note[t][i] = 0;
+        seq_vel[t][i] = VEL_DEF;
+        seq_glen[t][i] = GLEN_DEF;
+        seq_cond[t][i] = CD_NONE;
+        seq_rtg[t][i] = 0;
+        seq_mut[t][i] = 0;
+        seq_mcy[t][i] = seq_mfx[t][i] = seq_fcy[t][i] = 0;
+        seq_chf[t][i] = 0;
+        pl_clear(t, i);
+    }
+    pat_dirty = 1;
+}
+/* a parameter's definition (the pan's, as a bipolar 0 .. 127), and the sound's own value of it */
+static void pl_par(const sound_t *s, uint32_t id, par_t *p)
+{
+    static const par_t PAN = {"PAN", 0, 127, 64, PK_BIP, 0};
+    if (id == PL_PAN)
+        *p = PAN;
+    else
+        par_get(s, id >> 3, id & 7u, p);
+}
+static int32_t pl_base(const sound_t *s, uint32_t id) { return id == PL_PAN ? 64 : par_val(s, id >> 3, id & 7u); }
+static int32_t pl_val(uint32_t t, uint32_t i, uint32_t id)   /* step i's value of a parameter: locked, or the sound's */
+{
+    int j = pl_find(t, i, id);
+    return j >= 0 ? seq_lv[t][i][j] : pl_base(&ui.snd[t][ui.eng[t]], id);
+}
+
+/* the phrase generator's targets (phrase.c), as the parameters they lock */
+enum { LK_FREQ, LK_RESO, LK_FENV, LK_ADEC, LK_VOL, LK_OD, LK_BR, LK_SRR, LK_DEL, LK_REV, LK_CHR, LK_PAN, LK_DST, LK_SLICE,
+       NLK };
+/* (BITS, SRR, DESTROY and SLICE lock WRECK: its BITS, CRUSH, FOLD and RING) */
+static const uint8_t LK_PID[NLK]={PG_MACRO*8+0,PG_MACRO*8+7,PG_MACRO*8+1,PG_MACRO*8+3,PG_FX*8,
+    PG_MACRO*8+4,PG_WRECK*8+4,PG_WRECK*8+3,PG_MACRO*8+5,PG_MACRO*8+3,PG_MACRO*8+6,PL_PAN,PG_WRECK*8+0,PG_WRECK*8+1};
+static int32_t lk_base(const sound_t *s, uint32_t lk) { return pl_base(s, LK_PID[lk]); }
+static void note_text(char *b, uint32_t n)     /* C#3 */
+{
+    str_cpy(b, NOTE_NAME[n % 12u], 4);
+    fmt_int(b + str_len(b), (int32_t)(n / 12u) - 1);
+}
+
+static void level_pan_apply(uint32_t t)
+{
+    int32_t lv = ui.level[t], ph;
+    trk_pan[t] = ui.pan[t]*127/PAN_MAX;
+    trk_gain[t] = lv <= 0 ? 0 : (int32_t)(exp2_q16((lv - LEVEL_UNITY) * 16328) >> 2);
+    ph = (int32_t)((uint32_t)(ui.pan[t] + PAN_MAX) * (0x40000000u / (2u * PAN_MAX)));
+    trk_pl[t] = sin_ph((uint32_t)ph + 0x40000000u);
+    trk_pr[t] = sin_ph((uint32_t)ph);
+}
+static uint32_t next_seed(void)
+{
+    ui.seed = ui.seed * 1664525u + 1013904223u + fm1_ticks();
+    return ui.seed;
+}
+/* (build 77) a scale and a root drawn at random: the start, a new session, SHIFT + ARP (Tonitor's) */
+static void scale_draw(void)
+{
+    ui.scale = (uint8_t)((next_seed() >> 8) % NSCALE);
+    ui.root = (uint8_t)((next_seed() >> 8) % 12u);
+}
+static void mark(uint32_t t)
+{
+    ui.dirty[t] = 1;
+    prj_dirty = 1;                               /* (the project playing has changed) */
+}
+/* the main loop: each changed track's sound cooked and published (the ISR takes it at its next block) */
+static void ui_publish(void)
+{
+    uint32_t t;
+    for (t = 0; t < NLANE; t++)                  /* (each lane: a subtrack's sound too) */
+        if (ui.dirty[t] && track_publish(t, lane_snd(t)))
+            ui.dirty[t] = 0;
+}
+
+/* ------------------------------------------------------------ subtracks --- */
+/* (build 79, after Titan Haze's lanes) a DRUM track's subtracks ST-B .. ST-D, each a lane of the NXL shared ones, a
+ * track in its own right: its sound, steps, length, clock, direction, phrase, octave, transposition, level and pan.
+ * A track button held and a white key 1 .. 4 chooses one (taken then, its sound the kit's next piece); SHIFT with it,
+ * one past ST-A given up. Off DRUM, a track's subtracks are put away -- silent, kept, back as they were on DRUM --
+ * and another DRUM track may take one when no lane is free */
+static void lanes_apply(uint32_t t)              /* (track t's subtracks playing as its machine is DRUM, or not) */
+{
+    uint32_t l;
+    for (l = NTRACK; l < NLANE; l++)
+        if (ln_s[l] && ln_t[l] == t)
+            ln_on[l] = (uint8_t)trk_lanes(t);
+}
+static void lane_fresh(uint32_t l)               /* (a lane's own as at the start: its steps empty, at unity, centred) */
+{
+    steps_clear(l);
+    seq_len[l] = 0;
+    seq_div[l] = SEQ_DIV1;
+    seq_dir[l] = DIR_FWD;
+    ui.oct[l] = 0;
+    ui.trn[l] = 0;
+    ui.level[l] = LEVEL_UNITY;
+    ui.pan[l] = 0;
+    ui.gen_den[l] = ui.gen_cx[l] = 50;
+    ui.last_note[l] = ui.last_chf[l] = 0;
+    level_pan_apply(l);
+}
+/* the lane of track t's subtrack s (1 .. 3): its own; else a free one, or one a track off DRUM put away -- its sound
+ * new, the kit's next piece after the track's own (a kick's track: B a snare, C a hat, D a tom); NLANE: none */
+static uint32_t lane_take(uint32_t t, uint32_t s)
+{
+    static const char *const KIT[4] = {"HARD KICK", "BLOWN SNARE", "SHARD HAT", "WAR TOM"};
+    uint32_t l = lane_find(t, s), base;
+    int32_t f;
+    if (l < NLANE)
+        return l;
+    for (l = NTRACK; l < NLANE && ln_s[l]; l++)
+        ;
+    if (l == NLANE)
+        for (l = NTRACK; l < NLANE && trk_lanes(ln_t[l]); l++)
+            ;
+    if (l == NLANE)
+        return NLANE;
+    if (ln_s[l] && ui.sub[ln_t[l]] == ln_s[l])  /* (taken from a track off DRUM: its choice back on ST-A) */
+        ui.sub[ln_t[l]] = 0;
+    ln_on[l] = 0;
+    RING_PUBLISH();
+    ln_t[l] = (uint8_t)t;
+    ln_s[l] = (uint8_t)s;
+    lane_fresh(l);
+    f = lane_snd(t)->mach;
+    base = f == ENG_BD ? 0u : f == ENG_SD ? 1u : f == ENG_HHT ? 2u : 3u;
+    f = fam_find(KIT[(base + s) % 4u]);
+    gen_sound(&ui_lsnd[l - NTRACK], f >= 0 ? RECIPES[f].mach : ENG_BD, f, -1, next_seed());
+    ui.dirty[l] = 1;
+    RING_PUBLISH();
+    ln_on[l] = (uint8_t)trk_lanes(t);
+    return l;
+}
+static void lane_free(uint32_t l)                /* (a subtrack given up: its lane free, its steps gone) */
+{
+    uint32_t t = ln_t[l];
+    ln_on[l] = 0;
+    RING_PUBLISH();
+    ln_s[l] = 0;
+    lane_fresh(l);
+    if (lane_find(t, ui.sub[t]) >= NLANE)
+        ui.sub[t] = 0;
+    ev_post(EV_ARP_CLR, t, 0, 0);                /* (its arpeggiator back on the track's own lane) */
+    sel_sync();
+}
+
+/* HOME: a new sound for the chosen track (same: of the family it plays) */
+/* PERFORMANCE: a track with something to play (a step with a note, or a loop) */
+static int trk_material(uint32_t t)
+{
+    uint32_t i, l = trk_lane(t);
+    for (i = 0; i < NSTEP; i++)
+        if (seq_note[l][i])
+            return 1;
+    for (i = 0; i < NLOOP; i++)
+        if (lp_get(t, i))
+            return 1;
+    return 0;
+}
+/* .. CTRL ALL (the session's page) set to ALL: track t, not the chosen one, takes what the chosen one is given in
+ * PERFORMANCE -- a phrase, locks, a direction, a length, a clock, a transposition, a new sound, an EDIT page's
+ * turn -- if it has something to play, each on its own steps and sound */
+static int all_too(uint32_t t) { return perf_on && pnl[PN_CTRL_ALL] && t != ui.sel && trk_material(t); }
+static void new_sound(int same)
+{
+    sound_t *s = cur();
+    uint32_t m = s->mach, t;
+    int32_t fam = s->family;
+    if (same) gen_sound(s, m, fam, -1, next_seed());
+    else gen_profile(s, prof_of(s), fam, next_seed());   /* (another family of the profile it plays) */
+    mark(ui.sl);
+    for (t = 0; t < NTRACK; t++)
+        if (all_too(t)) {                            /* (CTRL ALL: each its own family's, or its profile's) */
+            sound_t *o = lane_snd(trk_lane(t));
+            if (same) gen_sound(o, o->mach, o->family, -1, next_seed());
+            else gen_profile(o, prof_of(o), o->family, next_seed());
+            mark(trk_lane(t));
+        }
+    say(same ? "SAME FAMILY" : "NEW", 700);
+    ui.home_until = fm1_ms + 400u;
+}
+
+/* ------------------------------------------------------------ input --- */
+static int32_t enc_take(uint32_t role) { return fm1_enc_take(PANEL_ENC[role]); }
+static int btn_bit(uint32_t mask, uint32_t label) { return (int)((mask >> PANEL_BTN[label]) & 1u); }
+
+static void par_turn(uint32_t id, uint32_t j, int32_t s)   /* a parameter of the chosen track's sound turned */
+{
+    sound_t *snd = cur();
+    par_t p;
+    int32_t v;
+    par_get(snd, id, j, &p);
+    if (p.kind == PK_NONE)
+        return;
+    v = par_step(&p, par_val(snd, id, j), s);
+    par_put(snd, id, j, v);
+    if (id == PG_FLT2 && j == 6u)                    /* (another FLTR machine: its knob G within its range) */
+        snd->flt[F_TYPE] = (uint8_t)(snd->fmach == FLT_LEG ? snd->flt[F_TYPE] != 0 : snd->flt[F_TYPE]);
+    mark(ui.sl);
+    if (mcfg.send_cc && mcfg.out_ch[ui.sel] && id * 8u + j < MIDI_NPAR && p.hi > p.lo)   /* (SEND CC: midi.c) */
+        midi_main_send(0xB0u | (mcfg.out_ch[ui.sel] - 1u), MIDI_CC[id * 8u + j],
+                       (uint32_t)((clampi(v, p.lo, p.hi) - p.lo) * 127 + (p.hi - p.lo) / 2) / (uint32_t)(p.hi - p.lo));
+}
+/* .. an EDIT page's parameter turned, CTRL ALL: the same page and row of each other track's sound, by the same steps
+ * (a list -- a mode, a route's source or destination -- left as it is) */
+static void all_par_turn(uint32_t pg, uint32_t j, int32_t s)
+{
+    uint32_t t;
+    for (t = 0; t < NTRACK; t++) {
+        uint32_t l = trk_lane(t), id;
+        sound_t *snd = lane_snd(l);
+        par_t p;
+        if (!all_too(t) || pg >= pages_n(snd))
+            continue;
+        id = page_id(snd, pg);
+        par_get(snd, id, j, &p);
+        if (p.kind != PK_NUM && p.kind != PK_BIP)
+            continue;
+        par_put(snd, id, j, par_step(&p, par_val(snd, id, j), s));
+        mark(l);
+    }
+}
+/* .. a track's length or clock turned (TRACK's KNOB 1, 2): the chosen lane's, and CTRL ALL the others' too */
+static void len_div_turn(uint32_t l, uint32_t j, int32_t s)
+{
+    if (j == 0u)
+        seq_len[l] = (uint8_t)clampi((seq_len[l] ? seq_len[l] : (int32_t)NSTEP) + s, 1, NSTEP);
+    else
+        seq_div[l] = (uint8_t)clampi((int32_t)seq_div[l] + s, 0, NDIV - 1);
+}
+static void all_len_div(uint32_t j, int32_t s)
+{
+    uint32_t t;
+    len_div_turn(ui.sl, j, s);
+    for (t = 0; t < NTRACK; t++)
+        if (all_too(t))
+            len_div_turn(trk_lane(t), j, s);
+}
+/* .. a macro turned (as Elektron's CONTROL ALL): the chosen track's, and the same macro on every other track with
+ * something to play, each its own sound's -- whatever that macro moves there -- by the same steps */
+static void perf_macro(uint32_t j, int32_t s)
+{
+    uint32_t t;
+    par_turn(PG_MACRO, j, s);
+    for (t = 0; t < NTRACK; t++) {
+        uint32_t l = trk_lane(t);
+        sound_t *snd = lane_snd(l);
+        par_t p;
+        if (t == ui.sel || !trk_material(t))
+            continue;
+        par_get(snd, PG_MACRO, j, &p);
+        if (p.kind == PK_NONE)
+            continue;
+        par_put(snd, PG_MACRO, j, par_step(&p, par_val(snd, PG_MACRO, j), s));
+        mark(l);
+    }
+}
+/* .. on: the state kept (not with a pattern on its way -- it waits); off: given back */
+static void perf_toggle(void)
+{
+    if (perf_on) {
+        perf_exit();
+        perf_on = 0;
+        say("RESTORED", 1000);
+    } else if (perf_enter()) {
+        perf_on = 1;
+        if (pg_any() && ui.page != PG_PAT)       /* (the sessions' pages: not while it is on) */
+            ui.page = PG_MAIN;
+        say("PERFORMANCE", 1000);
+    } else
+        say("WAIT", 700);
+    ui.force = 1;
+}
+static int fx_lfo(void) { return ui.fx_pg >= FXP_L1 && ui.fx_pg <= FXP_L3; }
+static int fx_arp(void) { return ui.fx_pg == FXP_ARP; }
+static int fx_pnl(void) { return ui.fx_pg < FXP_PATCH; }
+/* (Quasar: the panel pages not shown -- CLOCK, LOOPER, ATTEN, CV, PATCH: nothing of them sounds without cables, and
+ * there are none; kept in the numbering MIDI LEARN saves) */
+static int fxp_hidden(uint32_t pg) { return pg == FXP_CLK || pg == FXP_LR || pg == FXP_STUT || pg == FXP_CV || pg == FXP_PATCH; }
+static uint32_t fxp_step(uint32_t pg, int d)     /* (the next page shown, d +1 / -1, wrapping) */
+{
+    uint32_t i;
+    for (i = 0; i < NFXP; i++) {
+        pg = (pg + NFXP + (uint32_t)(d + (int)NFXP)) % NFXP;
+        if (!fxp_hidden(pg))
+            break;
+    }
+    return pg;
+}
+static int fx_patch(void) { return ui.fx_pg == FXP_PATCH; }
+/* the PATCH page's pins: a track's MOD pins its circuit has, and every panel pin */
+static int pin_ok(uint32_t pin)
+{
+    uint32_t t, k, m;
+    if (pin == P23_PIN_NONE)
+        return 1;
+    if (pin >= P23_PINS)
+        return 0;
+    if (pin >= P23_PIN_CLK)
+        return 1;
+    t = (pin - 1u) / P23_TRACK_PINS;
+    k = (pin - 1u) % P23_TRACK_PINS;
+    m = ui.eng[t % NTRACK];
+    return k < P23_T_MOD1 || k - P23_T_MOD1 < (m == ENG_BASS ? 5u : m == ENG_BD ? 3u : 2u);
+}
+static void pin_name(uint32_t pin, char *b)
+{
+    static const char *const TK[P23_T_MOD1] = {"OUT", "ENV", "TRIG", "EXT"};
+    static const char *const MODN[4][5] = {{"CV IN", "SHAPE", "WARP", "PM", "LPF"}, {"MOD", "WTF?", "OMG!", "", ""},
+                                           {"TUNE", "BPF", "", "", ""}, {"TUNE", "HPF", "", "", ""}};
+    static const char *const GN[P23_PINS - P23_PIN_CLK] = {
+        "CLK", "CLK MOD", "DIV 16", "DIV 8", "DIV 4", "DIV 2", "DIV 1", "DIV .5", "DIV .25", "LRST",
+        "LR1 CLK", "LR2 CLK", "LR3 CLK", "LR4 CLK", "LR5 CLK", "LR6 CLK",
+        "SH MOD", "SH CLK", "SH S/H", "SH DATA", "SH 1B", "SH 2B", "SH 1B SH", "SH 3B SH",
+        "LFO MOD", "LFO SYNC", "LFO SQR", "LFO TRI",
+        "FX TIME", "FX CLK", "FX TUNE", "FX FB", "FX MAD!", "DLY IN", "REV IN", "DLY OUT", "REV OUT", "MIX IN",
+        "VCA1 IN", "VCA1 CV", "VCA1 OUT", "VCA2 IN", "VCA2 CV", "VCA2 OUT", "INV IN", "INV OUT",
+        "CINV IN", "CINV CV", "CINV OUT", "SW1 IN", "SW1 CV", "SW1 OUT", "SW2 IN", "SW2 CV", "SW2 OUT",
+        "ATT1 IN", "ATT1 OUT", "ATT2 IN", "ATT2 OUT", "ATT3 IN", "ATT3 OUT", "ATT4 IN", "ATT4 OUT",
+        "PLS1 IN", "PLS1 OUT", "PLS2 IN", "PLS2 OUT", "MIDI CV1", "MIDI CV2", "MIDI CV3", "MIDI CV4",
+        "NOISE", "+10V", "GND", "TOUCH 1", "TOUCH 2", "DIODE A", "DIODE K", ".1UF A", ".1UF B", "10UF A", "10UF B"};
+    b[0] = 0;
+    if (pin == P23_PINS || pin == P23_PINS + 1u) {   /* (a sound's route: its own track's OUT / ENV) */
+        str_cpy(b, pin == P23_PINS ? "OWN OUT" : "OWN ENV", 10);
+        return;
+    }
+    if (pin == P23_PIN_NONE || pin >= P23_PINS) {
+        str_cpy(b, "--", 4);
+        return;
+    }
+    if (pin >= P23_PIN_CLK) {
+        str_cpy(b, GN[pin - P23_PIN_CLK], 12);
+        return;
+    }
+    {
+        uint32_t t = (pin - 1u) / P23_TRACK_PINS, k = (pin - 1u) % P23_TRACK_PINS, m = ui.eng[t % NTRACK] % NENG;
+        fmt_int(b, (int32_t)t + 1);
+        str_cpy(b + str_len(b), " ", 2);
+        str_cpy(b + str_len(b), k < P23_T_MOD1 ? TK[k] : MODN[m][k - P23_T_MOD1], 8);
+    }
+}
+static uint32_t pin_step(uint32_t pin, int32_t s)  /* the pin s steps on, the ones not there passed over (it wraps) */
+{
+    for (; s; s += s > 0 ? -1 : 1)
+        do
+            pin = s > 0 ? (pin + 1u) % P23_PINS : (pin + P23_PINS - 1u) % P23_PINS;
+        while (!pin_ok(pin));
+    return pin;
+}
+static const pnr_t *pn_row(uint32_t k) { return &PNR[ui.fx_pg % FXP_PATCH][k & 7u]; }
+static uint8_t *fx_vals(void)
+{
+    if (fx_arp())
+        return (uint8_t *)(uintptr_t)&arp_p[ui.sel][0];   /* (bytes the audio reads as they are) */
+    return &cur()->lfo[(ui.fx_pg - FXP_L1) % NLFO].spd;   /* (lfo_t: eight bytes, the rows' order) */
+}
+static int32_t fx_get(uint32_t k)                /* a page's parameter k (DUCK: its row, CMP_SLOT) */
+{
+    if (fx_pnl()) {
+        const pnr_t *r = pn_row(k);
+        if (r->idx == PNR_NONE || r->idx == PNR_QUANT || r->idx == PNR_CLEAR)
+            return 0;
+        if (r->idx == PNR_RUN)
+            return ui_lr_run;
+        if (r->idx == PNR_LRMODE)
+            return pnl[PN_LR_MODE1 + ui.sel % NTRACK];
+        return pnl[r->idx];
+    }
+    if (fx_patch())
+        return k == 0 ? pch_slot : k == 1 ? pcab[pch_slot].a : k == 2 ? pcab[pch_slot].b
+               : p23_pin_value(pcab[pch_slot].a ? pcab[pch_slot].a : pcab[pch_slot].b);
+    if (ui.fx_pg == FXP_CMP)
+        return CMP_SLOT[k & 1u] == CMP_SRC ? (int32_t)sc_get(ui.sel) : sc_lvl[ui.sel];
+    return fx_vals()[k];
+}
+static void fx_put(uint32_t k, int32_t v)
+{
+    if (fx_pnl()) {
+        const pnr_t *r = pn_row(k);
+        if (r->idx == PNR_NONE)
+            return;
+        if (r->idx == PNR_RUN) {
+            ui_lr_run = (uint8_t)v;
+            ev_post(EV_LR_RUN, 0, (uint32_t)v, 0);
+        } else if (r->idx == PNR_QUANT || r->idx == PNR_CLEAR) {
+            if (v) {
+                ev_post(r->idx == PNR_QUANT ? EV_LR_QUANT : EV_LR_CLEAR, ui.sel, 0, 0);
+                if (r->idx == PNR_QUANT)
+                    ui_lr_run = 0;
+                say(r->idx == PNR_QUANT ? "QUANTIZED" : "CLEARED", 900);
+            }
+        } else if (r->idx == PNR_LRMODE)
+            pnl[PN_LR_MODE1 + ui.sel % NTRACK] = (uint8_t)v;
+        else {
+            pnl[r->idx] = (uint8_t)v;
+            if (r->idx == PN_LR_BANK)
+                ev_post(EV_LR_BANK, (uint32_t)v, 0, 0);
+        }
+        return;
+    }
+    if (fx_patch()) {
+        if (k == 0)
+            pch_slot = (uint8_t)v;
+        else if (k == 1)
+            pcab[pch_slot].a = (uint8_t)v;
+        else if (k == 2)
+            pcab[pch_slot].b = (uint8_t)v;
+        return;
+    }
+    if (ui.fx_pg == FXP_CMP && CMP_SLOT[k & 1u] == CMP_SRC)
+        sc_put(ui.sel, (uint32_t)v);
+    else if (ui.fx_pg == FXP_CMP)
+        sc_lvl[ui.sel] = (uint8_t)v;
+    else
+        fx_vals()[k] = (uint8_t)v;
+}
+static uint32_t fx_n(void)
+{
+    if (fx_pnl()) {
+        uint32_t k = 8;
+        while (k && pn_row(k - 1u)->idx == PNR_NONE)
+            k--;
+        return k;
+    }
+    return fx_patch() ? 4u : ui.fx_pg == FXP_CMP ? 2u : fx_arp() ? NARP : NLF;
+}
+/* a page's parameter: 0 shown as it is (an LFO's START), 1 as 0 .. 100, 3 a list (SC SOURCE; an LFO's MULT, WAVE,
+ * MODE; the panel's switches), 4 as -64 .. +63 (an LFO's SPEED, FADE, DEPTH), 5 an LFO's DEST, 6 a pin, 7 a cable
+ * number, 8 a voltage, 9 as 0 .. 100 then RND (ST_VAL_RND: the STUTTER's RATE, DECAY) */
+static uint32_t fx_kind(uint32_t j)
+{
+    if (fx_pnl())
+        return pn_row(j)->n ? 3u : pn_row(j)->idx == PN_ST_RATE || pn_row(j)->idx == PN_ST_DECAY ? 9u : 1u;
+    if (fx_patch())
+        return j == 0 ? 7u : j < 3u ? 6u : 8u;
+    if (fx_arp())
+        return j == AR_GATE || j == AR_DENS || j == AR_ORND ? 1u : 3u;
+    if (fx_lfo())
+        return j == LF_SPH ? 0u : j == LF_DEST ? 5u : j == LF_MULT || j == LF_WAVE || j == LF_MODE ? 3u : 4u;
+    if (ui.fx_pg == FXP_CMP && CMP_SLOT[j & 1u] == CMP_SRC)
+        return 3u;
+    return 1u;
+}
+static uint32_t fx_list_n(uint32_t j)
+{
+    if (fx_pnl())
+        return pn_row(j)->n ? pn_row(j)->n : 2u;
+    if (fx_patch())
+        return j == 0 ? NPCAB : P23_PINS;
+    if (fx_arp())
+        return j == AR_MODE ? NAM : j == AR_RATE ? NAR_RATE : j == AR_RNG ? NAR_RNG : j == AR_BASS ? NAR_BASS : 2u;
+    if (fx_lfo())
+        return j == LF_MULT ? NLMULT : j == LF_WAVE ? NLW : NLM;
+    {
+        uint8_t src[NTRACK * NSUB + 1u], sb[NTRACK * NSUB + 1u];
+        return sc_entries(src, sb);
+    }
+}
+static void fx_changed(void)                     /* (an LFO: its track's sound; the panel is read at each block) */
+{
+    if (fx_lfo())
+        mark(ui.sl);
+}
+static void fx_turn(uint32_t j, int32_t s)
+{
+    int32_t v;
+    uint32_t kd;
+    if (j >= fx_n() || (fx_pnl() && pn_row(j)->idx == PNR_NONE))
+        return;
+    kd = fx_kind(j);
+    v = fx_get(j);
+    if (kd == 8u)
+        return;
+    if (kd == 9u) {                              /* (past 100: RND; back from it: 100) */
+        int32_t d = clampi((v >= (int32_t)ST_VAL_RND ? 101 : pct_disp(v)) + s, 0, 101);
+        fx_put(j, d == 101 ? (int32_t)ST_VAL_RND : pct_raw(d));
+        prj_dirty = 1;
+        return;
+    }
+    fx_put(j, kd == 1u ? pct_raw(pct_disp(v) + s)
+              : kd == 3u ? clampi(v + s, 0, (int32_t)fx_list_n(j) - 1)
+              : kd == 5u ? (int32_t)lfo_dest_step(cur(), ui.fx_pg - FXP_L1, (uint32_t)v, s)
+              : kd == 6u ? (int32_t)pin_step((uint32_t)v, s)
+              : kd == 7u ? clampi(v + s, 0, NPCAB - 1)
+              : clampi(v + s, 0, 127));
+    if (fx_arp() && j == AR_LATCH && !arp_p[ui.sel][AR_LATCH] && v)
+        ev_post(EV_ARP_CLR, ui.sel, 0, 0);       /* (LATCH off: the notes it kept let go) */
+    fx_changed();
+    prj_dirty = 1;
+}
+static void dial(uint32_t id, uint32_t j)
+{
+    ui.dial_pg = (uint8_t)id;
+    ui.dial_j = (uint8_t)j;
+    ui.dial_lk = 0;
+    ui.dial_until = fm1_ms + 1000u;
+}
+
+/* ----------------------------------------------------------- recording --- */
+enum { REC_OFF, REC_ARMED, REC_ON };
+static void rec_set(uint32_t r)
+{
+    ui.rec = (uint8_t)r;
+    met_on = (uint8_t)((r != REC_OFF || ui.lrec) && ui.click);
+    ui.force = 1;
+}
+
+/* the looper (the loops themselves: tracks.c). The step a note goes to: the nearest, in seq_gcount's count */
+static uint32_t loop_qnow(void)
+{
+    uint32_t g = seq_gcount, acc = seq_acc_now;
+    return g == 0xFFFFFFFFu ? 0u : g + (acc >= SEQ_16TH / 2u);
+}
+static uint32_t loop_len8(uint32_t ms)           /* a time held, in eighths of a step */
+{
+    uint32_t e = ((ms > 900000u ? 900000u : ms) * (uint32_t)fx_bpm10 + 9375u) / 18750u;   /* (x 8 / 150000; < 2^32) */
+    return e ? (e < 4096u ? e : 4096u) : 1u;     /* (rounded; up to the loop's whole 32 bars) */
+}
+static loop_t *lrp;                              /* the loop armed or being recorded (ui.lrec) */
+static void loop_arm(void)
+{
+    uint32_t t = ui.sel, l;
+    for (l = 0; l < NLOOP && lp_get(t, l); l++)
+        ;
+    if (l == NLOOP) {
+        say("3 LOOPS", 1200);
+        return;
+    }
+    if (!(lrp = lp_new(seq_lpat, t, l, LOOP_EV))) {   /* (every pattern's loops: the table or the notes full) */
+        say("NO ROOM", 1200);
+        return;
+    }
+    ui.lt = (uint8_t)t;
+    ui.ll = (uint8_t)l;
+    ui.lrec = 1;
+    memset(ui.lk_ev, 0xFF, sizeof ui.lk_ev);
+    rec_set(REC_OFF);                            /* (REC's recording off: one at a time) */
+    say("LOOP ARMED", 900);
+}
+static void loop_drop(void)                      /* the loop being recorded, dropped */
+{
+    lp_free(lrp);
+    lrp = 0;
+    ui.lrec = 0;
+    rec_set(ui.rec);
+}
+/* a note played with the looper armed or recording (k: its key, NKEY none), at step q of seq_gcount's count (the
+ * arpeggiator's: where it played it; 0xFFFFFFFF: now) */
+static void loop_note_at(const uint8_t *nn, uint32_t cnt, uint32_t vel, uint32_t k, uint32_t q, uint32_t l)
+{
+    loop_t *p = lrp;
+    uint32_t j;
+    if (!ui.lrec || !p || LANE_T(l) != ui.lt)    /* (lane l's notes: the track's, its subtrack noted with each) */
+        return;
+    if (!seq_run) {                              /* (stopped: the sequencer starts on it) */
+        seq_run = 1;
+        q = 0;
+    } else if (q == 0xFFFFFFFFu)
+        q = loop_qnow();
+    if (ui.lrec == 1) {
+        ui.lstart = q;
+        ui.lrec = 2;
+        ui.force = 1;
+    }
+    if (q - ui.lstart >= LOOP_MAX || p->n + cnt > p->cap)
+        return;
+    if (k < NKEY) {
+        ui.lk_ev[k] = p->n;
+        ui.lk_n[k] = (uint8_t)cnt;
+        ui.lk_t0[k] = fm1_ms;
+    }
+    for (j = 0; j < cnt; j++) {
+        p->ev[p->n].step = (uint16_t)(q - ui.lstart);
+        p->ev[p->n].len8 = LEV_PACK(4u, LANE_S(l));
+        p->ev[p->n].note = nn[j];
+        p->ev[p->n].vel = (uint8_t)clampi((int32_t)vel, 1, 127);
+        p->n++;
+    }
+}
+static void loop_note(const uint8_t *nn, uint32_t cnt, uint32_t vel, uint32_t k)   /* (a chord: its three) */
+{
+    loop_note_at(nn, cnt, vel, k, 0xFFFFFFFFu, ui.sl);
+}
+static void loop_release(uint32_t k)             /* a key the looper recorded let go: its notes' length */
+{
+    uint32_t j;
+    for (j = 0; ui.lrec == 2 && lrp && j < ui.lk_n[k] && ui.lk_ev[k] + j < lrp->n; j++)
+        lrp->ev[ui.lk_ev[k] + j].len8 = LEV_PACK(loop_len8(fm1_ms - ui.lk_t0[k]), LEV_SUB(lrp->ev[ui.lk_ev[k] + j]));
+    ui.lk_ev[k] = 0xFFFF;
+}
+/* REC: the loop ends, its length the nearest whole number of bars (one at least; build 42), so it never drifts from
+ * the patterns; it plays on from where it is in that length, its first step where its first note was (armed,
+ * nothing played: not armed) */
+static void loop_end(void)
+{
+    loop_t *p = lrp;
+    uint32_t q = loop_qnow(), len, i, j;
+    char m[16] = "LOOP ";
+    if (ui.lrec != 2 || !p || !p->n) {
+        loop_drop();
+        say("LOOP OFF", 900);
+        return;
+    }
+    len = (q - ui.lstart + 8u) / 16u * 16u;      /* (whole bars of 16 steps, the nearest) */
+    len = len < 16u ? 16u : len > LOOP_MAX ? LOOP_MAX : len;
+    for (i = 0; i < NKEY; i++)                   /* (keys still held: their notes to here) */
+        if (ui.lk_ev[i] != 0xFFFFu)
+            loop_release(i);
+    for (i = 0; i < p->n; i++)                   /* (a note at the end is the loop's first) */
+        p->ev[i].step = (uint16_t)(p->ev[i].step % len);
+    for (i = 1; i < p->n; i++) {                 /* (in order of steps) */
+        lev_t e = p->ev[i];
+        for (j = i; j > 0u && p->ev[j - 1u].step > e.step; j--)
+            p->ev[j] = p->ev[j - 1u];
+        p->ev[j] = e;
+    }
+    p->len = (uint16_t)len;
+    lp_resize(p, p->n);                          /* (its room: its notes, the rest given back) */
+    p->ref = lp_trn[ui.lt];                      /* (its notes as played, at the transposition playing: build 68) */
+    p->anchor = ui.lstart;                       /* (its first step where recording began: on now, at (q - lstart) % len) */
+    p->mute = 0;
+    p->cur = 0;
+    p->kick = (uint8_t)((q - ui.lstart) % len == 0u && seq_gcount != 0xFFFFFFFFu && q <= seq_gcount);   /* (its first
+                                                  * step due now and gone by: played at once) */
+    RING_PUBLISH();
+    p->on = 1;
+    lrp = 0;
+    ui.lrec = 0;
+    rec_set(ui.rec);
+    fmt_int(m + 5, ui.ll + 1);
+    str_cpy(m + str_len(m), "  ", 3);
+    fmt_int(m + str_len(m), (int32_t)(len / 16u));
+    str_cpy(m + str_len(m), len == 16u ? " BAR" : " BARS", 6);
+    say(m, 1200);
+}
+static uint32_t loops_n(uint32_t t)
+{
+    uint32_t l, n = 0;
+    for (l = 0; l < NLOOP; l++)
+        n += lp_get(t, l) != 0 && lp_get(t, l)->on;
+    return n;
+}
+/* a note played while recording (k: its key, NKEY none): into the chosen track's nearest step; the step the
+ * sequencer comes to next is not played that once (the key has) */
+static uint32_t rec_note_at(uint32_t note, uint32_t vel, uint32_t k, uint32_t f1, uint32_t pos, uint32_t acc)
+{
+    uint32_t t = ui.sl, i;                       /* (the lane: the chosen subtrack) */
+    if (ui.rec == REC_ARMED) {                   /* the first note: the sequencer starts on it, step 1 */
+        seq_skip[t][0] = 1;
+        seq_run = 1;
+        rec_set(REC_ON);
+        i = 0;
+    } else if (ui.rec != REC_ON || !seq_run)
+        return NSTEP;
+    else {
+        uint32_t len = seq_len[t] ? seq_len[t] : NSTEP;
+        if (pos >= len) {                        /* (just started: step 1 to come) */
+            i = 0;
+            seq_skip[t][0] = 1;
+        } else if (acc < SEQ_STEP8 / 2u)         /* (the track's own steps, on its own clock) */
+            i = pos;
+        else {
+            i = (pos + 1u) % len;
+            seq_skip[t][i] = 1;
+        }
+    }
+    seq_vel[t][i] = (uint8_t)clampi((int32_t)vel, 1, 127);
+    seq_glen[t][i] = GLEN_DEF;
+    seq_cond[t][i] = CD_NONE;
+    seq_rtg[t][i] = 0;
+    seq_mut[t][i] = 0;
+    seq_mcy[t][i] = seq_mfx[t][i] = seq_fcy[t][i] = 0;
+    pl_clear(t, i);
+    seq_chf[t][i] = (uint8_t)f1;
+    seq_note[t][i] = (uint8_t)note;
+    pat_dirty = 1;
+    if (k < NKEY) {
+        ui.rec_step[k] = (uint8_t)i;
+        ui.rec_tr[k] = (uint8_t)t;
+        ui.rec_t0[k] = fm1_ms;
+    }
+    return i;
+}
+/* (f1: a chord's form + 1, or 0; the sequencer where it is now) */
+static void rec_note(uint32_t note, uint32_t vel, uint32_t k, uint32_t f1)
+{
+    rec_note_at(note, vel, k, f1, seq_pos[ui.sl], seq_tacc_now[ui.sl]);
+}
+static uint32_t glen_of8(uint32_t e)             /* the step length nearest e eighths of a step */
+{
+    uint32_t g, best = 0;
+    for (g = 1; g < GLEN_INF; g++)
+        if (absi((int32_t)GLEN_8TH[g] - (int32_t)e) < absi((int32_t)GLEN_8TH[best] - (int32_t)e))
+            best = g;
+    return best;
+}
+/* the arpeggiator's notes (tracks.c: where the sequencer was as each played), the chosen track's recorded as the
+ * keys' are -- into its steps with REC, or into the loop being recorded -- each with its own length */
+static void arp_take(void)
+{
+    while (arp_rr != arp_rw) {
+        arp_rec_t r = arp_rq[arp_rr % ARP_RQ];
+        RING_PUBLISH();
+        arp_rr++;
+        if (r.t != ui.sl)                        /* (the chosen track's subtrack the arpeggiator plays) */
+            continue;
+        if (ui.rec != REC_OFF) {
+            uint32_t i = rec_note_at(r.note, r.vel, NKEY, 0, r.pos, r.acc);
+            if (i < NSTEP)
+                seq_glen[r.t][i] = (uint8_t)glen_of8(r.len8);
+        }
+        if (ui.lrec && lrp && ui.lt == LANE_T(r.t)) {
+            loop_t *p = lrp;
+            uint32_t n0 = p->n;
+            loop_note_at(&r.note, 1, r.vel, NKEY, r.q, r.t);
+            if (p->n > n0)
+                p->ev[n0].len8 = LEV_PACK(r.len8, LANE_S(r.t));
+        }
+    }
+}
+/* a key recorded let go: its step's length, as it was held (the nearest of the lengths, up to 16 steps) */
+static void rec_release(uint32_t k)
+{
+    uint32_t i = ui.rec_step[k], t = ui.rec_tr[k], ms = fm1_ms - ui.rec_t0[k], e, g, best = 0;
+    ui.rec_step[k] = 0xFF;
+    if (i >= NSTEP)
+        return;
+    if (ms > 60000u)
+        ms = 60000u;
+    e = ms * (uint32_t)fx_bpm10 * 8u / 150000u;  /* (eighths of a step: a step is 15000 / BPM ms) */
+    for (g = 1; g < GLEN_INF; g++)
+        if (absi((int32_t)GLEN_8TH[g] - (int32_t)e) < absi((int32_t)GLEN_8TH[best] - (int32_t)e))
+            best = g;
+    seq_glen[t][i] = (uint8_t)best;
+}
+
+static void midi_take(void)
+{
+#if TELEMETRY
+    if (tl_ready && tl_cmd[0] == 0x5Au) {        /* (a test of MIDI LEARN from the computer, F0 7D 5A a b c F7: the
+                                                  * panel's actions, as its keys call them; a 6: a report, F0 7D 5B) */
+        uint32_t a = tl_cmd[1], b = tl_cmd[2], c = tl_cmd[3];
+        if (a == 0u)
+            learn_toggle();
+        else if (a == 1u) {                      /* (EDIT on track b, its page c) */
+            ui.sel = (uint8_t)(b % NTRACK);
+            sel_sync();
+            ui.page = PG_EDIT;
+            ui.edit_pg = (uint8_t)(c % pages_n(cur()));
+            ui.ehalf = ui.lsel = ui.listen = 0;
+        } else if (a == 2u) {                    /* (the effects' page c) */
+            ui.page = PG_FXP;
+            ui.fx_pg = (uint8_t)(fxp_hidden(c % NFXP) ? fxp_step(c % NFXP, 1) : c % NFXP);
+            ui.ehalf = ui.lsel = ui.listen = 0;
+        } else if (a == 3u) {                    /* (PRESETS to row b) */
+            ui.lsel = (uint8_t)(b & 7u);
+            ui.ehalf = (uint8_t)(ui.lsel / 4u);
+            ui.listen = 0;
+        } else if (a == 4u || a == 5u)
+            learn_save(a == 5u);                 /* (SAVE; SHIFT + SAVE) */
+        else if (a == 8u) {                      /* (every binding forgotten: written as MIDI LEARN goes off) */
+            memset(mlearn, 0, sizeof mlearn);
+            ui.learn_dirty = 1;
+        }
+        else if (a == 12u) {                     /* (the LFOs' ticks, F0 7D 5F: steps mean, highest; cook mean,
+                                                  * highest; then cleared) */
+            uint8_t f[20];
+            uint32_t n = 0, i, v[4];
+            v[0] = tl_lfo[0] >> 4; v[1] = tl_lfo[1]; v[2] = tl_lfo[2] >> 4; v[3] = tl_lfo[3];
+            tl_lfo[1] = tl_lfo[3] = 0;
+            f[n++] = 0xF0; f[n++] = 0x7D; f[n++] = 0x5F;
+            for (i = 0; i < 4u; i++) {
+                f[n++] = (uint8_t)(v[i] >> 14 & 0x7Fu);
+                f[n++] = (uint8_t)(v[i] >> 7 & 0x7Fu);
+                f[n++] = (uint8_t)(v[i] & 0x7Fu);
+            }
+            f[n++] = 0xF7;
+            ota_wire_send(f, n);
+        } else if (a == 11u) {                     /* (the LFOs' load: b 1, three on each track's sound; 0, none) */
+            uint32_t t, n;
+            static const uint8_t D[NLFO] = {1u + PG_MACRO * 8u, 2u, 1u + PG_AMP * 8u + 7u};
+            for (t = 0; t < NTRACK; t++) {
+                sound_t *sd = &ui.snd[t][ui.eng[t]];
+                lfos_off(sd);
+                for (n = 0; b && n < NLFO; n++) {
+                    sd->lfo[n].dest = D[n];
+                    sd->lfo[n].wave = (uint8_t)(n == 1u ? LW_RND : LW_SINE);
+                    sd->lfo[n].spd = (uint8_t)(90 + 7 * n);
+                    sd->lfo[n].mult = (uint8_t)(3 + n);
+                    sd->lfo[n].dep = (uint8_t)(64 + 20);
+                }
+                mark(t);
+            }
+        } else if (a == 10u) {                   /* (the cooks' cost, F0 7D 5E: ticks, 24 MHz) */
+            uint8_t f[40];
+            uint32_t n = 0, i;
+            f[n++] = 0xF0; f[n++] = 0x7D; f[n++] = 0x5E;
+            for (i = 0; i < 8u; i++) {
+                f[n++] = (uint8_t)(tl_cook[i] >> 14 & 0x7Fu);
+                f[n++] = (uint8_t)(tl_cook[i] >> 7 & 0x7Fu);
+                f[n++] = (uint8_t)(tl_cook[i] & 0x7Fu);
+            }
+            f[n++] = 0xF7;
+            ota_wire_send(f, n);
+        }
+#if FELUCCA_UAC
+        else if (a == 9u) {                      /* (USB audio's counters, F0 7D 5D: usb.c's uac) */
+            uint8_t f[64];
+            uint32_t n = 0, v[16], i;
+            v[0] = uac.alt; v[1] = uac.r48; v[2] = uac.go; v[3] = uac.flowing; v[4] = uac.starts; v[5] = uac.pkts;
+            v[6] = uac.frames; v[7] = uac.underruns; v[8] = uac.overruns; v[9] = uac.missed; v[10] = uac.stalls;
+            v[11] = uac.adj_up; v[12] = uac.adj_down; v[13] = uac.fill_lo; v[14] = uac.fill_hi; v[15] = uac.rate_sets;
+            f[n++] = 0xF0; f[n++] = 0x7D; f[n++] = 0x5D;
+            for (i = 0; i < 16u; i++) {
+                f[n++] = (uint8_t)(v[i] >> 14 & 0x7Fu);
+                f[n++] = (uint8_t)(v[i] >> 7 & 0x7Fu);
+                f[n++] = (uint8_t)(v[i] & 0x7Fu);
+            }
+            f[n++] = 0xF7;
+            ota_wire_send(f, n);
+        }
+#endif
+        else if (a == 7u) {                      /* (the MIDI inputs' report, F0 7D 5C: the TRS jack's bytes and
+                                                  * drops, the clock's pulses and interval, the settings, PLAY) */
+            uint8_t f[40];
+            uint32_t n = 0, v[9], i;
+            v[0] = um.bytes;
+            v[1] = um.drops;
+            v[2] = xk_n;
+            v[3] = xk_iv / 100u;
+            v[4] = mcfg.clk_in | (uint32_t)mcfg.trs_in << 1 | (uint32_t)mcfg.usb_in << 2 | (uint32_t)mcfg.rcv_note << 3;
+            v[5] = seq_run;
+            v[6] = (uint32_t)fx_bpm10;
+            v[7] = mi_w;
+            v[8] = (uint32_t)midi_slave();
+            fm1_uart1_probe(60000u, &v[1], &v[7], &v[3], &v[6]);   /* (PH8 for 60 ms, the UART: in place of
+                                                  * the drops, the share high; of mi_w, the changes) */
+            f[n++] = 0xF0; f[n++] = 0x7D; f[n++] = 0x5C;
+            for (i = 0; i < 9u; i++) {           /* (each 21 bits, three bytes) */
+                f[n++] = (uint8_t)(v[i] >> 14 & 0x7Fu);
+                f[n++] = (uint8_t)(v[i] >> 7 & 0x7Fu);
+                f[n++] = (uint8_t)(v[i] & 0x7Fu);
+            }
+            f[n++] = 0xF7;
+            ota_wire_send(f, n);
+        } else if (a == 6u) {                    /* (the report: the state, then each binding and its parameter's
+                                                  * value now) */
+            uint8_t f[8 + 8 * NLEARN];
+            uint32_t n = 0, i;
+            f[n++] = 0xF0; f[n++] = 0x7D; f[n++] = 0x5B;
+            f[n++] = ui.learn; f[n++] = ui.listen; f[n++] = ui.lsel; f[n++] = ui.page; f[n++] = ui.sel;
+            f[n++] = ui.edit_pg; f[n++] = ui.fx_pg;
+            for (i = 0; i < NLEARN; i++) {
+                const learn_t *l = &mlearn[i];
+                int32_t v;
+                if (!l->kind)
+                    continue;
+                if (l->kind == LK_SND)
+                    v = par_val(&ui.snd[l->track % NTRACK][ui.eng[l->track % NTRACK]], l->id / 8u, l->id % 8u);
+                else {
+                    uint8_t pg = ui.fx_pg, sel = ui.sel;
+                    ui.fx_pg = (uint8_t)(l->id / 8u % NFXP);
+                    ui.sel = (uint8_t)(l->track % NTRACK);
+                    sel_sync();
+                    v = fx_get(l->id % 8u);
+                    ui.fx_pg = pg;
+                    ui.sel = sel;
+                    sel_sync();
+                }
+                f[n++] = l->ch; f[n++] = l->cc; f[n++] = l->kind; f[n++] = l->track; f[n++] = l->id;
+                f[n++] = (uint8_t)((uint32_t)(v + 1024) >> 7 & 0x7Fu); f[n++] = (uint8_t)((uint32_t)(v + 1024) & 0x7Fu);
+            }
+            f[n++] = 0xF7;
+            ota_wire_send(f, n);
+        }
+        ui.force = 1;
+        RING_PUBLISH();
+        tl_ready = 0;
+    }
+    if (tl_ready) {                              /* (a diagnosis: a recipe on a track, or its level) */
+        uint32_t t = tl_cmd[1] % NTRACK;
+        if (tl_cmd[0] == 0x56u && tl_cmd[2] < NENG) {
+            gen_sound(&ui.snd[t][tl_cmd[2]], tl_cmd[2], tl_cmd[3], -1, 7u + t);
+            ui.eng[t] = tl_cmd[2];
+            lanes_apply(t);
+        } else if (tl_cmd[0] == 0x57u) {
+            ui.level[t] = tl_cmd[2];
+            level_pan_apply(t);
+        } else if (tl_cmd[0] == 0x58u)
+        {   FAR(p23_diagnostic)(tl_cmd[1] | (uint32_t)tl_cmd[2] << 7);   /* (the engine's sections left out: their cost) */
+            tl_core = (uint8_t)((tl_cmd[2] >> 2 & 1u) | (tl_cmd[2] >> 5 & 2u)); }   /* (512: CPU0 alone; 8192: a patient join) */
+        mark(t);
+        ui.force = 1;
+        RING_PUBLISH();
+        tl_ready = 0;
+    }
+#endif
+    while (mi_r != mi_w) {   /* (build 46: by the GLOBAL SETUP's MIDI settings, midi.c) */
+        uint32_t pkt = midi_in_q[mi_r % MQ], cin = pkt & 15u, ch = ((pkt >> 8) & 15u) + 1u, d1 = (pkt >> 16) & 0x7Fu;
+        uint32_t d2 = pkt >> 24 & 0x7Fu, m = 0, t;
+        RING_PUBLISH();
+        mi_r++;
+        if (!((pkt >> 4) & 15u ? mcfg.trs_in : mcfg.usb_in))   /* (PORTS: cable 1 the TRS jack's, 0 USB's) */
+            continue;
+        if (cin == 0xCu) {                       /* a program change: a pattern of the session */
+            if (mcfg.pc_in && ch == mcfg.pc_in_ch && d1 < 16u)   /* (PAT_SLOTS, projects.c) */
+                pat_switch(d1);
+            continue;
+        }
+        if (mcfg.auto_ch == ch)                  /* the tracks it plays: AUTO the chosen one, and those on it */
+            m |= 1u << ui.sel;
+        for (t = 0; t < NTRACK; t++)
+            if (mcfg.in_ch[t] == ch)
+                m |= 1u << t;
+        if (cin == 0xBu && ui.listen) {          /* MIDI LEARN waiting: this CC, from either input, any channel */
+            learn_take(ch, d1);
+            continue;
+        }
+        if (cin == 0xBu && mcfg.rcv_cc && learn_cc(ch, d1, d2))   /* (a CC learned: its parameter, before the map) */
+            continue;
+        if (cin == 0xBu) {
+            for (t = 0; mcfg.rcv_cc && t < NTRACK; t++)
+                if (m >> t & 1u)
+                    midi_cc_in(t, d1, d2);
+            continue;
+        }
+        if (cin == 9u && d2) {
+            if (!mcfg.rcv_note)
+                continue;
+            for (t = 0; t < NTRACK; t++)
+                if ((ui.midi_track[d1] >> t) & 1u)
+                    trk_note_off(t, d1);
+            ui.midi_track[d1] = (uint8_t)m;
+            for (t = 0; t < NTRACK; t++) {
+                if (!(m >> t & 1u))
+                    continue;
+                uint32_t l = trk_lane(t);        /* (its subtrack chosen) */
+                ui.last_note[l] = (uint8_t)d1;
+                ui.last_chf[l] = 0;
+                if (arp_on[t]) {                 /* (the track's arpeggiator: the note its; what it plays recorded) */
+                    ev_post(EV_ARP_ON, l, d1, d2);
+                    continue;
+                }
+                ev_post(EV_ON, l, d1, d2);
+                if (t == ui.sel) {               /* (the chosen track's: recorded, into the steps or a loop) */
+                    uint8_t n8 = (uint8_t)d1;
+                    rec_note(d1, d2, NKEY, 0);
+                    loop_note(&n8, 1, d2, NKEY);
+                }
+            }
+        } else if (cin == 8u || cin == 9u) {
+            for (t = 0; t < NTRACK; t++)
+                if ((ui.midi_track[d1] >> t) & 1u)
+                    trk_note_off(t, d1);
+            ui.midi_track[d1] = 0;
+        }
+    }
+}
+/* a parameter of track t's sound (page id, knob j) from a CC's value, over its whole range; 0 if there is none */
+static int snd_cc_set(uint32_t t, uint32_t id, uint32_t j, uint32_t v)
+{
+    sound_t *s = &ui.snd[t][ui.eng[t]];
+    par_t p;
+    par_get(s, id, j, &p);                       /* (every page a Quasar sound has: circuit, ENV, MACRO, ROUTE, WRECK) */
+    if (p.kind == PK_NONE || p.hi <= p.lo)
+        return 0;
+    par_put(s, id, j, p.lo + (int32_t)((v * (uint32_t)(p.hi - p.lo) + 63u) / 127u));
+    if (id == PG_FLT2 && j == 6u)
+        s->flt[F_TYPE] = (uint8_t)(s->fmach == FLT_LEG ? s->flt[F_TYPE] != 0 : s->flt[F_TYPE]);
+    mark(t);
+    return 1;
+}
+/* a CC received for track t: its level (7), pan (10), mute (94), or a parameter of its sound (MIDI_CC) */
+static uint8_t midi_lv_sent[NTRACK], midi_pn_sent[NTRACK], midi_mu_sent[NTRACK];
+static void midi_cc_in(uint32_t t, uint32_t cc, uint32_t v)
+{
+    if (cc == CC_LEVEL) {
+        ui.level[t] = (int8_t)((v * LEVEL_MAX + 63u) / 127u);
+        level_pan_apply(t);
+        midi_lv_sent[t] = (uint8_t)ui.level[t];  /* (taken in: not sent back) */
+    } else if (cc == CC_PAN) {
+        ui.pan[t] = (int8_t)((int32_t)((v * 2u * PAN_MAX + 63u) / 127u) - PAN_MAX);
+        level_pan_apply(t);
+        midi_pn_sent[t] = (uint8_t)ui.pan[t];
+    } else if (cc == CC_MUTE) {
+        trk_mute[t] = (uint8_t)(v >= 64u);
+        midi_mu_sent[t] = trk_mute[t];
+    } else if (MIDI_PAR[cc] != 0xFFu) {
+        if (!snd_cc_set(t, MIDI_PAR[cc] / 8u, MIDI_PAR[cc] % 8u, v))
+            return;
+    } else
+        return;
+    prj_dirty = 1;
+    ui.force = 1;
+}
+/* each pass: following a clock, its tempo; SEND CC, the level, pan and mutes as they change (whatever changed them) */
+static void midi_poll(void)
+{
+    static uint8_t was;
+    uint32_t t;
+    if (midi_slave()) {
+        uint32_t b = midi_ext_bpm10();
+        if (b != (uint32_t)fx_bpm10) {
+            fx_bpm10 = (int32_t)b;
+            fx_cook_all();
+        }
+        was = 1;
+    } else if (was) {
+        was = 0;
+        tempo_apply();
+    }
+    for (t = 0; t < NTRACK; t++) {
+        uint32_t ch = mcfg.out_ch[t];
+        if (midi_lv_sent[t] != (uint8_t)ui.level[t]) {
+            midi_lv_sent[t] = (uint8_t)ui.level[t];
+            if (mcfg.send_cc && ch)
+                midi_main_send(0xB0u | (ch - 1u), CC_LEVEL, (uint32_t)(ui.level[t] * 127 + LEVEL_MAX / 2) / LEVEL_MAX);
+        }
+        if (midi_pn_sent[t] != (uint8_t)ui.pan[t]) {
+            midi_pn_sent[t] = (uint8_t)ui.pan[t];
+            if (mcfg.send_cc && ch)
+                midi_main_send(0xB0u | (ch - 1u), CC_PAN, (uint32_t)((ui.pan[t] + PAN_MAX) * 127 + PAN_MAX) / (2u * PAN_MAX));
+        }
+        if (midi_mu_sent[t] != trk_mute[t]) {
+            midi_mu_sent[t] = trk_mute[t];
+            if (mcfg.send_cc && ch)
+                midi_main_send(0xB0u | (ch - 1u), CC_MUTE, trk_mute[t] ? 127u : 0u);
+        }
+    }
+}
+
+/* ------------------------------------------------------- MIDI LEARN --- */
+/* (build 48; midi.c's mlearn) the parameter the page's chosen row is: a sound's (EDIT) or an effect's (SEQ); 0 none */
+static int learn_here(uint32_t *kind, uint32_t *track, uint32_t *id)
+{
+    if (ui.page == PG_EDIT) {
+        par_t p;
+        uint32_t pg = page_id(cur(), ui.edit_pg);
+        par_get(cur(), pg, ui.lsel, &p);
+        if (p.kind == PK_NONE || p.hi <= p.lo)
+            return 0;
+        *kind = LK_SND;
+        *id = pg * 8u + ui.lsel;
+    } else if (ui.page == PG_FXP) {
+        if (fx_arp() || fx_patch() || ui.lsel >= fx_n() || fx_kind(ui.lsel) == 5u)   /* (an LFO's DEST, the ARP page: not by a CC) */
+            return 0;
+        *kind = LK_FX;
+        *id = ui.fx_pg * 8u + ui.lsel;
+    } else
+        return 0;
+    *track = ui.sel;
+    return 1;
+}
+static int learn_fx_own(uint32_t id)             /* (an effect's row that is a track's own: COMP's SC rows, LFOs) */
+{
+    return id / 8u == FXP_CMP || (id / 8u >= FXP_L1 && id / 8u <= FXP_L3) || (id / 8u == FXP_LR && id % 8u == 0u);
+}
+static int learn_is(const learn_t *l, uint32_t kind, uint32_t track, uint32_t id)
+{
+    return l->kind == kind && l->id == id && (kind == LK_FX && !learn_fx_own(id) ? 1 : l->track == track);
+}
+static int learn_of(uint32_t kind, uint32_t track, uint32_t id)   /* the binding of a parameter: its index, or -1 */
+{
+    uint32_t i;
+    for (i = 0; i < NLEARN; i++)
+        if (learn_is(&mlearn[i], kind, track, id))
+            return (int)i;
+    return -1;
+}
+/* a CC as MIDI LEARN waited for it: bound to the chosen row's parameter (taken from whatever it was bound to) */
+static void learn_take(uint32_t ch, uint32_t cc)
+{
+    uint32_t kind, track, id, i, f = NLEARN;
+    char m[12] = "CC ";
+    ui.listen = 0;
+    ui.force = 1;
+    if (!learn_here(&kind, &track, &id))
+        return;
+    for (i = 0; i < NLEARN; i++) {
+        learn_t *l = &mlearn[i];
+        if (l->kind && ((l->ch == ch && l->cc == cc) || learn_is(l, kind, track, id)))
+            l->kind = LK_NONE;                   /* (a CC one parameter, a parameter one CC) */
+        if (!l->kind && f == NLEARN)
+            f = i;
+    }
+    if (f == NLEARN) {
+        say("LEARN FULL", 1500);
+        return;
+    }
+    mlearn[f].ch = (uint8_t)ch;
+    mlearn[f].cc = (uint8_t)cc;
+    mlearn[f].kind = (uint8_t)kind;
+    mlearn[f].track = (uint8_t)track;
+    mlearn[f].id = (uint8_t)id;
+    ui.learn_dirty = 1;
+    fmt_int(m + 3, (int32_t)cc);
+    say(m, 1200);
+}
+/* a CC received: its learned parameter set, over its range (1); not learned, 0 */
+static int learn_cc(uint32_t ch, uint32_t cc, uint32_t v)
+{
+    uint32_t i;
+    int hit = 0;
+    for (i = 0; i < NLEARN; i++) {
+        const learn_t *l = &mlearn[i];
+        if (!l->kind || l->ch != ch || l->cc != cc)
+            continue;
+        hit = 1;
+        if (l->kind == LK_SND)
+            snd_cc_set(l->track % NTRACK, l->id / 8u, l->id % 8u, v);
+        else {                                   /* (an effect: its page and, for COMP's SC rows, its track, for the
+                                                  * moment; the value as its kind reads) */
+            uint8_t pg = ui.fx_pg, sel = ui.sel;
+            uint32_t k = l->id % 8u;
+            ui.fx_pg = (uint8_t)(l->id / 8u % NFXP);
+            ui.sel = (uint8_t)(l->track % NTRACK);
+            sel_sync();
+            if (k < fx_n() && fx_kind(k) != 5u) {
+                uint32_t kd = fx_kind(k);
+                fx_put(k, kd == 3u ? (int32_t)((v * (fx_list_n(k) - 1u) + 63u) / 127u)
+                          : (int32_t)v);
+                if (fx_lfo())
+                    mark(ui.sl);
+                else
+                    fx_cook_all();
+            }
+            ui.fx_pg = pg;
+            ui.sel = sel;
+            sel_sync();
+        }
+        prj_dirty = 1;
+        ui.force = 1;
+    }
+    return hit;
+}
+/* the 4th black key: MIDI LEARN on or off (off: the bindings, if changed, into the flash) */
+static void learn_toggle(void)
+{
+    ui.learn = (uint8_t)!ui.learn;
+    ui.listen = 0;
+    ui.lsel = (uint8_t)(ui.ehalf * 4u);
+    if (!ui.learn && ui.learn_dirty) {
+        setup_write();
+        ui.learn_dirty = 0;
+    }
+    say(ui.learn ? "MIDI LEARN" : "LEARN OFF", 900);
+    ui.force = 1;
+}
+/* SAVE on a page, MIDI LEARN on: wait for a CC for the chosen row (again: not); SHIFT + SAVE, its binding cleared */
+static void learn_save(int sh)
+{
+    uint32_t kind, track, id;
+    int i;
+    ui.force = 1;
+    if (!learn_here(&kind, &track, &id)) {
+        ui.listen = 0;
+        say("NOT HERE", 900);
+        return;
+    }
+    if (sh) {
+        ui.listen = 0;
+        if ((i = learn_of(kind, track, id)) >= 0) {
+            mlearn[i].kind = LK_NONE;
+            ui.learn_dirty = 1;
+            say("CC CLEARED", 900);
+        }
+        return;
+    }
+    ui.listen = (uint8_t)!ui.listen;
+    say(ui.listen ? "TURN A KNOB" : "NOT LEARNED", ui.listen ? 60000u : 900u);
+}
+
+/* a key let go: the notes it sounds (a chord: its three) */
+static void key_off(uint32_t k)
+{
+    uint32_t j;
+    if (!ui.key_arp[k] && ui.key_track[k] < NTRACK && ui.key_cn[k][0])
+        ev_post(EV_LR, ui.key_track[k], P23_LR_ADD, 0);
+    for (j = 0; j < 3u; j++)
+        if (ui.key_cn[k][j])
+            ev_post(ui.key_arp[k] ? EV_ARP_OFF : EV_OFF, ui.key_track[k], ui.key_cn[k][j], 0);
+    ui.key_arp[k] = 0;
+    ui.key_cn[k][0] = ui.key_cn[k][1] = ui.key_cn[k][2] = 0;
+}
+
+/* SHIFT and a white key: step i of the chosen track. Pressed on an empty step, the track's last note put there; let go
+ * without PRESETS turned, a step that held a note emptied. Held, it is silent (build 70: heard from the keys, out of
+ * the step view) */
+static void step_say(uint32_t i, uint32_t n)
+{
+    char m[16] = "STEP ";
+    fmt_int(m + 5, (int32_t)i + 1);
+    str_cpy(m + str_len(m), "  ", 3);
+    if (n)
+        note_text(m + str_len(m), n);
+    else
+        str_cpy(m + str_len(m), "OFF", 4);
+    say(m, 1500);
+}
+static void step_down(uint32_t k)
+{
+    uint32_t i = (uint32_t)white_ix(k), n = seq_note[ui.sl][i];
+    ui.step_key = (uint8_t)k;
+    ui.step_edit = 0;
+    ui.step_new = !n;
+    ui.step_t0 = fm1_ms;
+    if (!n) {
+        n = ui.last_note[ui.sl] ? ui.last_note[ui.sl] : key_note(0, ui.oct[ui.sl]);
+        seq_vel[ui.sl][i] = VEL_DEF;
+        seq_glen[ui.sl][i] = GLEN_DEF;
+        seq_cond[ui.sl][i] = CD_NONE;
+        seq_rtg[ui.sl][i] = 0;
+        seq_mut[ui.sl][i] = 0;
+        seq_mcy[ui.sl][i] = seq_mfx[ui.sl][i] = seq_fcy[ui.sl][i] = 0;
+        seq_chf[ui.sl][i] = ui.last_note[ui.sl] ? ui.last_chf[ui.sl] : 0u;   /* (the chord last played, too) */
+        seq_note[ui.sl][i] = (uint8_t)n;
+        pat_dirty = 1;
+    }
+    step_say(i, n);
+    ui.force = 1;
+}
+/* a parameter of the step held turned: locked (from the sound's value, if it had none) */
+static void pl_turn(uint32_t id, int32_t s, int show)
+{
+    uint32_t t = ui.sl, i = (uint32_t)white_ix(ui.step_key);
+    par_t p;
+    pl_par(cur(), id, &p);
+    if (p.kind == PK_NONE)
+        return;
+    if (pl_set(t, i, id, par_step(&p, pl_val(t, i, id), s))) {
+        say("8 LOCKS", 900);                     /* (the step's places all taken) */
+        return;
+    }
+    ui.step_edit = 1;
+    pat_dirty = 1;
+    if (show) {                                  /* (as a dial) */
+        ui.dial_lk = (uint8_t)(id + 1u);
+        ui.dial_step = (uint8_t)i;
+        ui.dial_until = fm1_ms + 1000u;
+    }
+}
+/* the knobs on the step held (EDIT not up): the note, the velocity, the length, the condition */
+static void step_knob(uint32_t j, int32_t s)
+{
+    uint32_t t = ui.sl, i = (uint32_t)white_ix(ui.step_key);
+    if (ui.mod) {                                /* MOD: MUTATE (-N .. -1, OFF, +1 .. +N, RND), its EVERY, MIDI FX, its
+                                                  * EVERY */
+        if (j == 0u) {
+            int32_t n = SCALE_N[ui.scale], v = seq_mut[t][i], x = v == MUT_RND ? 2 * n + 1 : clampi(v, -n, n) + n;
+            x = clampi(x + s, 0, 2 * n + 1);
+            seq_mut[t][i] = (int8_t)(x == 2 * n + 1 ? MUT_RND : x - n);
+        } else if (j == 1u)
+            seq_mcy[t][i] = (uint8_t)clampi((int32_t)seq_mcy[t][i] + s, 0, 15);
+        else if (j == 2u)
+            seq_mfx[t][i] = (uint8_t)clampi((int32_t)seq_mfx[t][i] + s, 0, NMFX - 1);
+        else if (j == 3u)
+            seq_fcy[t][i] = (uint8_t)clampi((int32_t)seq_fcy[t][i] + s, 0, 15);
+        else
+            return;
+    } else if (j >= 4u) {                               /* (the other half: E the ratchet) */
+        if (j == 4u)
+            seq_rtg[t][i] = (uint8_t)clampi((int32_t)seq_rtg[t][i] + s, 0, NRTG - 1);
+        else
+            return;
+    } else if (j == 0u)
+        seq_note[t][i] = (uint8_t)scale_move((int32_t)seq_note[t][i], s);
+    else if (j == 1u)
+        seq_vel[t][i] = (uint8_t)clampi(pct_raw(pct_disp(seq_vel[t][i]) + s), 1, 127);   /* (shown 1 .. 100) */
+    else if (j == 2u)
+        seq_glen[t][i] = (uint8_t)clampi(seq_glen[t][i] + s, 0, NGLEN - 1);
+    else
+        seq_cond[t][i] = (uint8_t)clampi(seq_cond[t][i] + s, 0, NCOND - 1);
+    ui.step_edit = 1;
+    ui.touched = (int8_t)(j & 3u);
+    ui.touch_until = fm1_ms + 1500u;
+    pat_dirty = 1;
+}
+static void step_up(void)
+{
+    uint32_t i = (uint32_t)white_ix(ui.step_key);
+    if (!ui.step_new && !ui.step_edit && (uint32_t)(fm1_ms - ui.step_t0) < 400u) {
+        seq_note[ui.sl][i] = 0;
+        pat_dirty = 1;
+        step_say(i, 0);
+    }
+    ui.step_key = KEY_NONE;
+    ui.force = 1;
+}
+
+/* SHIFT and step i held: copied (the same again: let go); a step copied, pasted into i, on the chosen track */
+static void step_copy_hold(uint32_t i)
+{
+    uint32_t t = ui.sl, j;
+    char m[12] = "STEP ";
+    fmt_int(m + 5, (int32_t)i + 1);
+    if (ui.sclip.on && ui.sclip.t == t && ui.sclip.i == i) {
+        ui.sclip.on = 0;
+        say("COPY OFF", 900);
+        ui.force = 1;
+        return;
+    }
+    if (ui.sclip.on) {                           /* pasted */
+        seq_note[t][i] = 0;                      /* (silent while it changes) */
+        seq_vel[t][i] = ui.sclip.vel;
+        seq_glen[t][i] = ui.sclip.glen;
+        seq_cond[t][i] = ui.sclip.cond;
+        seq_rtg[t][i] = ui.sclip.rtg;
+        seq_mut[t][i] = ui.sclip.mut;
+        seq_mcy[t][i] = ui.sclip.mcy;
+        seq_mfx[t][i] = ui.sclip.mfx;
+        seq_fcy[t][i] = ui.sclip.fcy;
+        seq_chf[t][i] = ui.sclip.chf;
+        pl_clear(t, i);
+        for (j = 0; j < NPL; j++)
+            if (ui.sclip.lid[j] != PL_NONE)
+                (void)pl_set(t, i, ui.sclip.lid[j], ui.sclip.lv[j]);
+        seq_note[t][i] = ui.sclip.note;
+        ui.sclip.on = 0;
+        pat_dirty = 1;
+        flash("PASTED", m, C_OK);
+        return;
+    }
+    if (!seq_note[t][i]) {
+        say("EMPTY", 900);
+        return;
+    }
+    ui.sclip.t = (uint8_t)t;                     /* copied */
+    ui.sclip.i = (uint8_t)i;
+    ui.sclip.note = seq_note[t][i];
+    ui.sclip.vel = seq_vel[t][i];
+    ui.sclip.glen = seq_glen[t][i];
+    ui.sclip.cond = seq_cond[t][i];
+    ui.sclip.rtg = seq_rtg[t][i];
+    ui.sclip.mut = seq_mut[t][i];
+    ui.sclip.mcy = seq_mcy[t][i];
+    ui.sclip.mfx = seq_mfx[t][i];
+    ui.sclip.fcy = seq_fcy[t][i];
+    ui.sclip.chf = seq_chf[t][i];
+    for (j = 0; j < NPL; j++) {
+        ui.sclip.lid[j] = seq_lid[t][i][j];
+        ui.sclip.lv[j] = seq_lv[t][i][j];
+    }
+    ui.sclip.on = 1;
+    ui.force = 1;
+}
+
+/* (build 78) MUTE mode's mutes: as they will be (those waiting, MUTE QT), a bit a track; set -- with MUTE QT on and the
+ * sequencer playing, waiting for the chosen track to begin its time through again (the sequencer applies them: tracks.c),
+ * otherwise at once */
+static uint8_t ses_muq;                          /* (the session's MUTE QT: its page, projects.c) */
+static uint32_t mute_to(void)
+{
+    uint32_t q = seq_mq, m = 0, j;
+    if (q & 0x80u)
+        return q & 0x3Fu;
+    for (j = 0; j < NTRACK; j++)
+        m |= (uint32_t)(trk_mute[j] != 0) << j;
+    return m;
+}
+static void mute_set(uint32_t m)
+{
+    uint32_t j, now = 0;
+    for (j = 0; j < NTRACK; j++)
+        now |= (uint32_t)(trk_mute[j] != 0) << j;
+    seq_mq = 0;
+    RING_PUBLISH();
+    if (ses_muq && seq_run) {
+        if (m != now) {
+            seq_mq_t = ui.sl;               /* (the chosen lane's cycle) */
+            RING_PUBLISH();
+            seq_mq = (uint8_t)(0x80u | m);
+        }
+        return;
+    }
+    for (j = 0; j < NTRACK; j++)
+        trk_mute[j] = (uint8_t)(m >> j & 1u);
+}
+static void ui_input(void)
+{
+    uint32_t rel, press = fm1_input_edges(&rel), keys, ch, k, t, j;
+    int32_t s, e_pre, e_sel, e_alg;
+    int sh = (int)((fm1_in.notes >> KEY_SHIFT) & 1u);
+    sel_sync();                                      /* (the lane chosen, as the track chosen is now) */
+    sc_apply();
+    (void)rel;
+    pat_poll();                                      /* (a pattern switched as the sequencer took it in) */
+    arp_take();                                      /* (the arpeggiator's notes recorded: build 52) */
+    midi_poll();                                     /* (the clock followed, the CCs out: build 46) */
+    setup_poll();
+    {   /* CPU1 retired as it plays (a fault, a stall, a misread): said, once */
+        static uint8_t was_on;
+        if (was_on && !audio_worker_online)
+            say("1 CORE", 4000);
+        was_on = (uint8_t)audio_worker_online;
+    }
+    {   /* the scale, for the sequencer's MUTATE and MIDI FX */
+        uint32_t m = 0, q;
+        for (q = 0; q < SCALE_N[ui.scale]; q++)
+            m |= 1u << SCALE_STEP[ui.scale][q];
+        seq_smask = (uint16_t)m;
+        seq_sroot = ui.root;
+    }
+    if (ui.mute_mode && ui.page != PG_PAT && (ui.page != PG_MAIN || step_view()))
+        ui.mute_mode = 0;                            /* (MUTE mode: the track's view and the PATTERNS grid only, build
+                                                      * 63) */
+    if ((seq_mq & 0x80u) && !seq_run) {             /* (MUTE QT: stopped with mutes waiting -- now) */
+        uint32_t j, q = seq_mq;
+        seq_mq = 0;
+        for (j = 0; j < NTRACK; j++)
+            trk_mute[j] = (uint8_t)(q >> j & 1u);
+        ui.force = 1;
+    }
+    for (t = 0; ui.mute_mode && t < NTRACK; t++) {   /* MUTE mode: a track's button let go soon, muted or not; held
+                                                      * 1 s, soloed (every other muted) */
+        uint32_t b = 1u << t;
+        if (btn_bit(press, TRACK_BTN[t])) {
+            ui.tb_down |= (uint8_t)b;
+            ui.tb_long &= (uint8_t)~b;
+            ui.tb_t0[t] = fm1_ms;
+        } else if ((ui.tb_down & b) && !btn_bit(fm1_in.buttons, TRACK_BTN[t])) {
+            char m[10] = "MUTE  ";
+            ui.tb_down &= (uint8_t)~b;
+            if (!(ui.tb_long & b)) {
+                ui.solo = 0xFF;                  /* (a mute changed by hand: no solo to undo) */
+                mute_set(mute_to() ^ b);
+                if (!(mute_to() & b))
+                    str_cpy(m, "PLAY  ", 7);
+                m[5] = (char)('1' + t);
+                say(m, 900);
+                prj_dirty = 1;
+                ui.force = 1;
+            }
+        } else if ((ui.tb_down & b) && !(ui.tb_long & b) && (uint32_t)(fm1_ms - ui.tb_t0[t]) >= 1000u) {
+            char m[10] = "SOLO  ";
+            uint32_t j;
+            ui.tb_long |= (uint8_t)b;
+            if (ui.solo == t) {                  /* (the soloed track held again: the mutes as they were before) */
+                mute_set(ui.pre_solo);
+                ui.solo = 0xFF;
+                say("SOLO OFF", 1200);
+            } else {
+                if (ui.solo == 0xFFu)            /* (another soloed after one: the mutes before the first kept) */
+                    ui.pre_solo = (uint8_t)mute_to();
+                ui.solo = (uint8_t)t;
+                mute_set(0x3Fu & ~b);
+                (void)j;
+                m[5] = (char)('1' + t);
+                say(m, 1200);
+            }
+            prj_dirty = 1;
+            ui.force = 1;
+        }
+    }
+    for (t = 0; !ui.mute_mode && t < NTRACK; t++)
+        if (btn_bit(press, TRACK_BTN[t])) {
+            ui.sel = (uint8_t)t;
+            sel_sync();
+            if (ui.page == PG_TEMPO || ui.page == PG_SCALE || pg_any() || (ui.page == PG_FXP && !sh))   /* (the effects' pages: back to the
+                                                      * track; SHIFT: they stay, COMP's sidechain the chosen track's) */
+                ui.page = PG_MAIN;
+            if (ui.page == PG_EDIT && ui.edit_pg >= pages_n(cur()))
+                ui.edit_pg = 0;
+            ui.force = 1;
+        }
+    if (btn_bit(press, B_SEQ) && sh && !pg_any()) {   /* SHIFT + SEQ: the chosen track's LFOs thrown anew (build 58) */
+        lfo_random(cur(), next_seed());
+        mark(ui.sl);
+        say("LFO RANDOM", 900);
+        ui.force = 1;
+    } else if (btn_bit(press, B_SEQ)) {              /* CHORUS, COMP, DELAY, REVERB, LFO 1 .. 3, back */
+        if (ui.page != PG_FXP) {
+            ui.page = PG_FXP;
+            ui.fx_pg = (uint8_t)fxp_step(NFXP - 1u, 1);   /* (the first page shown) */
+        } else {
+            uint32_t nx = fxp_step(ui.fx_pg, 1);
+            if (nx <= ui.fx_pg)                      /* (past the last: back to the track's view) */
+                ui.page = PG_MAIN;
+            else
+                ui.fx_pg = (uint8_t)nx;
+        }
+        ui.ehalf = ui.lsel = ui.listen = 0;   /* (MIDI LEARN: from A, nothing waited for) */
+        ui.force = 1;
+    }
+    /* SAVE, as Tonitor's (build 76; the patterns its snapshots): let go soon, the PATTERNS grid (on it: back); held 0.8 s,
+     * the session saved (on the grid: the pattern playing saved into the slot under the cursor). SHIFT + SAVE let go
+     * soon, the sessions' list (on it: back); held 0.8 s, GLOBAL SETUP. On the sessions' pages and in GLOBAL SETUP,
+     * their own at once, as pressed (held, nothing more: a long press must not save in place of LOAD -- build 39) */
+    if (btn_bit(press, B_SAVE) && perf_on && !ui.learn && sh) {
+        say("PERF MODE", 900);                       /* (PERFORMANCE: no session saved or loaded till it is off; the
+                                                      * PATTERNS grid open, to keep what plays as a pattern) */
+        ui.save_down = ui.ssv_down = 0;
+    } else if (btn_bit(press, B_SAVE)) {
+        if (ui.page == PG_PRJ || ui.page == PG_PRJD) {
+            prj_press(sh);
+            ui.save_down = ui.ssv_down = 0;
+        } else if (ui.page == PG_SET) {          /* GLOBAL SETUP's own (setup.c) */
+            setup_press(sh);
+            ui.save_down = ui.ssv_down = 0;
+        } else if (ui.learn && (ui.page == PG_EDIT || ui.page == PG_FXP)) {   /* MIDI LEARN: the row's CC (build 48) */
+            learn_save(sh);
+            ui.save_down = ui.ssv_down = 0;
+        } else if (sh) {
+            ui.ssv_down = 1;
+            ui.ssv_long = 0;
+            ui.ssv_t0 = fm1_ms;
+        } else {
+            ui.save_down = 1;
+            ui.save_long = 0;
+            ui.save_t0 = fm1_ms;
+        }
+    }
+    if (ui.ssv_down) {
+        if (!btn_bit(fm1_in.buttons, B_SAVE)) {
+            ui.ssv_down = 0;
+            if (!ui.ssv_long) {
+                ui.page = PG_PRJ;
+                prj_grid_open();
+                ui.force = 1;
+            }
+        } else if (!ui.ssv_long && (uint32_t)(fm1_ms - ui.ssv_t0) >= 800u) {
+            ui.ssv_long = 1;
+            setup_open();
+        }
+    }
+    if (ui.save_down) {
+        if (!btn_bit(fm1_in.buttons, B_SAVE)) {
+            ui.save_down = 0;
+            if (!ui.save_long) {
+                if (ui.page == PG_PAT)
+                    ui.page = PG_MAIN;
+                else {
+                    ui.page = PG_PAT;
+                    pat_grid_open();
+                }
+                ui.force = 1;
+            }
+        } else if (!ui.save_long && (uint32_t)(fm1_ms - ui.save_t0) >= 800u) {
+            ui.save_long = 1;
+            if (ui.page == PG_PAT)
+                pat_save_cursor();
+            else
+                prj_quick_save();
+        }
+    }
+    /* HOME: let go soon, a new sound (SHIFT: of the same family); held 0.8 s, the project saved */
+    if (btn_bit(press, B_HOME)) {
+        ui.home_down = 1;
+        ui.home_long = 0;
+        ui.home_t0 = fm1_ms;
+    }
+    if (ui.home_down) {
+        if (!btn_bit(fm1_in.buttons, B_HOME)) {
+            ui.home_down = 0;
+            if (!ui.home_long)
+                new_sound(sh);
+        } else if (!ui.home_long && (uint32_t)(fm1_ms - ui.home_t0) >= 800u) {
+            ui.home_long = 1;
+            prj_quick_save();
+        }
+    }
+    if (btn_bit(press, B_ARP) && sh) {               /* SHIFT + ARP: a scale and root at random, the SCALE page shown
+                                                      * a moment over any page (Tonitor's; build 77) */
+        scale_draw();
+        prj_dirty = 1;
+        ui.touch_until = fm1_ms;
+        ui.sc_peek_until = fm1_ms + 1500u;
+        ui.force = 1;
+    } else if (btn_bit(press, B_ARP)) {              /* ARP: the SCALE page, or back (Tonitor's; build 76) */
+        ui.page = ui.page == PG_SCALE ? PG_MAIN : PG_SCALE;
+        ui.touch_until = fm1_ms;
+        ui.force = 1;
+    }
+    ui.half = ui.page == PG_EDIT || ui.page == PG_FXP || step_page() ? ui.ehalf : (uint8_t)sh;   /* (the pages' half:
+                                                                                              * PRESETS's) */
+    if (step_page()) {                               /* a step held in the step view, TRIG on: the knobs its */
+        for (j = 0; j < 4u; j++)
+            if ((s = enc_take(KNOB[j])) != 0)
+                step_knob(j + 4u * ui.half, s);
+    } else if (step_held() && ui.page != PG_EDIT && ui.page != PG_TRK && ui.page != PG_GEN) {   /* .. TRIG off: the
+                                                                                   * knobs' own, locked on it */
+        static const uint8_t LKK[2][4] = {{PG_MACRO * 8 + 0, PG_MACRO * 8 + 1, PG_MACRO * 8 + 2, PG_MACRO * 8 + 3},
+                                          {PG_MACRO * 8 + 4, PG_MACRO * 8 + 5, PG_MACRO * 8 + 6, PG_MACRO * 8 + 7}};
+        for (j = 0; j < 4u; j++)
+            if ((s = enc_take(KNOB[j])) != 0)
+                pl_turn(LKK[sh][j], s, 1);
+    } else if (step_held() && ui.page == PG_EDIT) {  /* .. with the EDIT pages up: what they turn, locked on it */
+        uint32_t id = page_id(cur(), ui.edit_pg);
+        for (j = 0; j < 4u; j++)
+            if ((s = enc_take(KNOB[j])) != 0) {
+                pl_turn(id * 8u + j + 4u * ui.half, s, 0);
+                ui.touched = (int8_t)j;
+                ui.touch_until = fm1_ms + 1500u;
+            }
+    } else if (ui.page == PG_EDIT) {                        /* the page's parameters */
+        uint32_t id = page_id(cur(), ui.edit_pg);
+        for (j = 0; j < 4u; j++)
+            if ((s = enc_take(KNOB[j])) != 0) {
+                par_turn(id, j + 4u * ui.half, s);
+                all_par_turn(ui.edit_pg, j + 4u * ui.half, s);   /* (CTRL ALL: the other tracks' too) */
+                ui.touched = (int8_t)j;
+                ui.touch_until = fm1_ms + 1500u;
+            }
+    } else if (ui.page == PG_GEN) {                  /* PHRASE: KNOB 1 DENSITY, 2 COMPLEXITY */
+        for (j = 0; j < 4u; j++)
+            if ((s = enc_take(KNOB[j])) != 0 && j < 2u) {
+                uint8_t *v = j ? &ui.gen_cx[ui.sl] : &ui.gen_den[ui.sl];
+                uint32_t t;
+                *v = (uint8_t)clampi(*v + s, 0, 100);
+                for (t = 0; t < NTRACK; t++)         /* (CTRL ALL: the other tracks' too) */
+                    if (all_too(t)) {
+                        v = j ? &ui.gen_cx[trk_lane(t)] : &ui.gen_den[trk_lane(t)];
+                        *v = (uint8_t)clampi(*v + s, 0, 100);
+                    }
+                pat_dirty = 1;
+                ui.touched = (int8_t)j;
+                ui.touch_until = fm1_ms + 1500u;
+            }
+    } else if (ui.page == PG_TRK) {                  /* TRACK: KNOB 1 the length, 2 the clock */
+        for (j = 0; j < 4u; j++)
+            if ((s = enc_take(KNOB[j])) != 0 && j < 2u) {
+                all_len_div(j, s);                   /* (the chosen subtrack's lane; CTRL ALL, the others' too) */
+                pat_dirty = 1;
+                ui.touched = (int8_t)j;
+                ui.touch_until = fm1_ms + 1500u;
+            }
+    } else if (ui.page == PG_FXP) {
+        for (j = 0; j < 4u; j++)
+            if ((s = enc_take(KNOB[j])) != 0) {
+                fx_turn(j + 4u * ui.half, s);
+                ui.touched = (int8_t)j;
+                ui.touch_until = fm1_ms + 1500u;
+            }
+    } else {                                         /* the knobs' own: FREQ, RESO, the sends (SHIFT: chorus, drive) */
+        /* the track's four macros; with SHIFT the second layer: DRIVE, FX, ATTACK and the eighth */
+        static const uint8_t ID[2][4] = {{PG_MACRO, PG_MACRO, PG_MACRO, PG_MACRO}, {PG_MACRO, PG_MACRO, PG_MACRO, PG_MACRO}};
+        static const uint8_t J[2][4] = {{0, 1, 2, 3}, {4, 5, 6, 7}};
+        for (j = 0; j < 4u; j++)
+            if ((s = enc_take(KNOB[j])) != 0) {
+                if (perf_on)                         /* (PERFORMANCE: every track with notes, as one) */
+                    perf_macro(J[sh][j], s);
+                else
+                    par_turn(ID[sh][j], J[sh][j], s);
+                dial(ID[sh][j], J[sh][j]);
+            }
+    }
+    if (btn_bit(press, B_PLAY) && sh) {              /* SHIFT + PLAY: the metronome */
+        ui.click = (uint8_t)!ui.click;
+        rec_set(ui.rec);
+        say(ui.click ? "CLICK ON" : "CLICK OFF", 900);
+    } else if (btn_bit(press, B_PLAY)) {             /* PLAY: as it is let go (held: the TEMPO page) */
+        ui.play_down = 1;
+        ui.play_long = 0;
+        ui.play_t0 = fm1_ms;
+    }
+    if (ui.play_down) {
+        if (!btn_bit(fm1_in.buttons, B_PLAY)) {
+            ui.play_down = 0;
+            if (!ui.play_long) {                     /* the sequencer (stopped: recording ends, a loop being recorded
+                                                      * dropped; armed: it plays, recording) */
+                if (!seq_run && midi_slave())    /* (following a clock: on its next pulse; build 46) */
+                    xk_go = 1;
+                else
+                    seq_run = (uint8_t)!seq_run;
+                if (!seq_run && ui.lrec)
+                    loop_drop();
+                if (!seq_run && ui.rec)
+                    rec_set(REC_OFF);
+                else if (seq_run && ui.rec == REC_ARMED)
+                    rec_set(REC_ON);
+                say(seq_run || xk_go ? "PLAY" : "STOP", 700);
+            }
+        } else if (!ui.play_long && (uint32_t)(fm1_ms - ui.play_t0) >= 800u) {
+            ui.play_long = 1;
+            ui.page = ui.page == PG_TEMPO ? PG_MAIN : PG_TEMPO;
+            ui.force = 1;
+        }
+    }
+    if (btn_bit(press, B_REC) && ui.lrec) {          /* the looper armed or recording: REC ends the loop (SHIFT
+                                                      * and held on: emptied, as below) */
+        loop_end();
+        if (sh) {
+            ui.lrec_down = ui.lview = 1;
+            ui.lv_any = 0;
+            ui.lrec_t0 = fm1_ms;
+        }
+    } else if (btn_bit(press, B_REC) && sh) {        /* SHIFT + REC: the looper (on release; held: its loops) */
+        ui.lrec_down = 1;
+        ui.lview = ui.lv_any = 0;
+        ui.lrec_t0 = fm1_ms;
+    } else if (btn_bit(press, B_REC)) {              /* REC: armed (playing: recording), or off */
+        rec_set(ui.rec ? REC_OFF : seq_run ? REC_ON : REC_ARMED);
+        say(ui.rec == REC_ON ? "RECORDING" : ui.rec == REC_ARMED ? "REC ARMED" : "REC OFF", 900);
+    }
+    if (ui.lrec_down) {
+        if (!btn_bit(fm1_in.buttons, B_REC)) {
+            ui.lrec_down = 0;
+            if (!ui.lview)
+                loop_arm();
+            ui.lview = 0;
+            ui.lv_k = KEY_NONE;
+            ui.force = 1;
+        } else if (!ui.lv_any && sh && (uint32_t)(fm1_ms - ui.lrec_t0) >= 1500u) {   /* (held on: all emptied) */
+            uint32_t l;
+            for (l = 0; l < NLOOP; l++)
+                if (lp_get(ui.sel, l) != lrp)
+                    lp_free(lp_get(ui.sel, l));
+            ui.lv_any = ui.lview = 1;
+            flash("EMPTY", "LOOPS", C_BAD);
+        } else if (!ui.lview && (uint32_t)(fm1_ms - ui.lrec_t0) >= 400u) {
+            char m[12] = "LOOPS ";
+            ui.lview = 1;
+            fmt_int(m + 6, (int32_t)loops_n(ui.sel));
+            say(m, 1500);
+        }
+    }
+    if (ui.lrec == 2 && loop_qnow() - ui.lstart >= LOOP_MAX)   /* (32 bars: the loop ends by itself) */
+        loop_end();
+    /* PRESETS, SELECT, ALGORITHM: each read once, then to the page's own use (on the sessions' and patterns' pages
+     * PRESETS is theirs, SELECT and ALGORITHM do nothing) */
+    e_pre = enc_take(EN_PRESET);
+    e_sel = enc_take(EN_SELECT);
+    e_alg = enc_take(EN_ALGO);
+    if (pg_any()) {
+        if (e_pre && ui.page == PG_SET)
+            setup_preset(e_pre);
+        else if (e_pre)
+            prj_preset(e_pre);
+        e_pre = e_sel = e_alg = 0;
+    }
+    if (ui.page == PG_SCALE) {                       /* the SCALE page: SELECT the root, ALGORITHM the scale (Tonitor's) */
+        if (e_sel) {
+            ui.root = (uint8_t)(((int32_t)ui.root + e_sel % 12 + 12) % 12);   /* (round the octave) */
+            ui.touched = 0;
+        }
+        if (e_alg) {
+            ui.scale = (uint8_t)clampi((int32_t)ui.scale + e_alg, 0, NSCALE - 1);
+            ui.touched = 1;
+        }
+        if (e_sel || e_alg) {
+            ui.touch_until = fm1_ms + 1500u;
+            prj_dirty = 1;
+        }
+        e_pre = e_sel = e_alg = 0;
+    }
+    if (step_view() && ui.step_key != KEY_NONE) {   /* a step held: SELECT its level, ALGORITHM its pan, locked */
+        if (e_sel)
+            pl_turn(PG_AMP * 8u + 7u, e_sel, 1);   /* (VOLUME) */
+        if (e_alg)
+            pl_turn(PL_PAN, e_alg, 1);
+        e_sel = e_alg = 0;
+    }
+    if ((s = e_sel) != 0) {                          /* the level */
+        char m[12] = "VOL ";
+        int32_t lv = clampi(ui.level[ui.sl] + s, 0, LEVEL_MAX);
+        ui.level[ui.sl] = (int8_t)lv;
+        level_pan_apply(ui.sl);
+        prj_dirty = 1;
+        if (!lv)
+            str_cpy(m + 4, "OFF", 8);
+        else {
+            fmt_int(m + 4, (lv * 100 + LEVEL_MAX / 2) / LEVEL_MAX);
+            str_cpy(m + str_len(m), "%", 2);
+        }
+        say(m, 1200);
+    }
+    if ((s = e_alg) != 0) {                          /* the pan */
+        char m[12] = "PAN ";
+        int32_t pn = clampi(ui.pan[ui.sl] + s, -PAN_MAX, PAN_MAX);
+        ui.pan[ui.sl] = (int8_t)pn;
+        level_pan_apply(ui.sl);
+        prj_dirty = 1;
+        if (!pn)
+            str_cpy(m + 4, "C", 8);
+        else {
+            m[4] = pn < 0 ? 'L' : 'R';
+            m[5] = ' ';
+            fmt_int(m + 6, (pn < 0 ? -pn : pn) * 100 / PAN_MAX);
+        }
+        say(m, 1200);
+    }
+    if (btn_bit(press, B_OCTDN) || btn_bit(press, B_OCTUP)) {
+        int d = btn_bit(press, B_OCTUP) ? 1 : -1;
+        ui.listen = 0;                               /* (MIDI LEARN: another page, nothing waited for) */
+        ui.lsel = 0;
+        if (ui.page == PG_EDIT) {                    /* the page before / after (its A .. D) */
+            uint32_t n = pages_n(cur());
+            ui.edit_pg = (uint8_t)((ui.edit_pg + n + (uint32_t)(d + (int)n)) % n);
+            ui.ehalf = ui.lsel = ui.listen = 0;   /* (MIDI LEARN: from A, nothing waited for) */
+            ui.force = 1;
+        } else if (ui.page == PG_FXP) {              /* CHORUS, COMP, DELAY, REVERB, LFO 1 .. 3 (ARP: alone) */
+            if (!fx_arp()) {
+                ui.fx_pg = (uint8_t)fxp_step(ui.fx_pg, d);   /* (the pages shown only) */
+            }
+            ui.ehalf = ui.lsel = ui.listen = 0;   /* (MIDI LEARN: from A, nothing waited for) */
+            ui.force = 1;
+        } else if (sh || step_view()) {             /* transposition: SHIFT every track's steps; the step view the
+                                                      * track's */
+            char m[16];
+            uint32_t t;
+            if (sh) {
+                for (t = 0; t < NLANE; t++)          /* (every lane: the subtracks taken too) */
+                    if (t < NTRACK || ln_s[t])
+                        trn_track(t, d);
+                str_cpy(m, "TRN ALL ", 16);
+            } else {
+                trn_track(ui.sl, d);
+                for (t = 0; t < NTRACK; t++)         /* (CTRL ALL: the other tracks' too) */
+                    if (all_too(t))
+                        trn_track(trk_lane(t), d);
+                str_cpy(m, "TRN ", 16);
+            }
+            trn_text(m + str_len(m), ui.trn[ui.sl]);
+            say(m, 1200);
+            ui.force = 1;
+        } else {
+            char m[8] = "OCT  ";
+            int32_t o = clampi(ui.oct[ui.sl] + d, -3, 3);
+            ui.oct[ui.sl] = (int8_t)o;
+            prj_dirty = 1;
+            m[4] = o < 0 ? '-' : o > 0 ? '+' : ' ';
+            m[5] = (char)('0' + (o < 0 ? -o : o));
+            m[6] = 0;
+            say(m, 1200);
+        }
+    }
+    if ((s = e_pre) != 0 && step_page() && ui.mod) {   /* (MOD: one page, no halves) */
+        ;
+    } else if ((s = e_pre) != 0 && ui.page == PG_TEMPO) {   /* TEMPO: PRESETS the session's tempo */
+        ui.tempo = (int16_t)clampi(ui.tempo + s, 10, 300);
+        tempo_apply();
+        prj_dirty = 1;
+        ui.force = 1;
+    } else if ((s = e_pre) != 0 && ui.learn && (ui.page == PG_EDIT || ui.page == PG_FXP) && !step_page()) {
+        ui.lsel = (uint8_t)clampi((int32_t)ui.lsel + s, 0, 7);   /* MIDI LEARN: PRESETS the row, A .. H (the half
+                                                  * shown follows it) */
+        ui.ehalf = (uint8_t)(ui.lsel / 4u);
+        ui.listen = 0;
+        ui.force = 1;
+    } else if ((s = e_pre) != 0 && (ui.page == PG_EDIT || ui.page == PG_FXP || step_page())) {   /* EDIT, the effects: PRESETS the page's
+                                                                          * half, right E .. H, left A .. D (never the
+                                                                          * machine) */
+        ui.ehalf = (uint8_t)(s > 0);
+        if(ui.page==PG_FXP && fx_n()<=4)ui.ehalf=0;
+        ui.force = 1;
+    } else if (s && ui.page != PG_MAIN) {
+        ;                                            /* (elsewhere PRESETS does nothing: only the track's view picks the
+                                                      * machine or the family) */
+    } else if (s && sh) {                            /* SHIFT + PRESETS: the family before / after, a new sound */
+        sound_t *sn = cur();
+        uint32_t m = sn->mach, md = snd_mode(sn);
+        int32_t f = sn->family, n = (int32_t)NRECIPE, d = s > 0 ? 1 : -1, i;
+        if (f < 0 || f >= n || RECIPES[f].mach != m || RECIPES[f].mode != md)
+            f = d > 0 ? -1 : n;                      /* (not of this profile: from its first, or its last) */
+        for (; s; s -= d) {
+            for (i = f + d; i >= 0 && i < n && (RECIPES[i].mach != m || RECIPES[i].mode != md); i += d)
+                ;
+            if (i < 0 || i >= n)
+                break;                           /* (the profile's first or last family: it stays) */
+            f = i;
+        }
+        if (f >= 0 && f < n && RECIPES[f].mach == m && RECIPES[f].mode == md) {
+            gen_sound(sn, m, f, -1, next_seed());
+            mark(ui.sl);
+            ui.home_until = fm1_ms + 300u;
+        }
+    } else if (s && ui.sl >= NTRACK) {               /* (a subtrack past ST-A: DRUM's, always) */
+        sound_t *sn = cur();
+        uint32_t m = (uint32_t)clampi((int32_t)sn->mach + (s > 0 ? 1 : -1), 0, NENG-1);
+        if (m != sn->mach) { gen_sound(sn, m, -1, -1, next_seed()); mark(ui.sl); }
+        ui.force = 1;
+    } else if (s) {                                  /* the engine profile: a circuit and its mode */
+        int32_t p = (int32_t)prof_of(cur()), q = clampi(p + (s > 0 ? 1 : -1), 0, (int32_t)NPROF - 1);
+        if (q != p) {
+            const prof_t *pf = &PROFILES[q];
+            sound_t *sn = &ui.snd[ui.sel][pf->mach];
+            ui.eng[ui.sel] = pf->mach;
+            snd_draw(sn);                            /* (drawn now, from its seed, if it never was) */
+            if (snd_mode(sn) != pf->mode)
+                gen_profile(sn, (uint32_t)q, -1, next_seed());   /* (that circuit's sound in another mode: a new one) */
+            lanes_apply(ui.sel);                     /* (off DRUM: its subtracks put away, silent; back: as they were) */
+            sel_sync();
+            mark(ui.sel);
+            if (ui.page == PG_EDIT && ui.edit_pg >= pages_n(cur()))
+                ui.edit_pg = 0;
+            ui.force = 1;
+        }
+    }
+    keys = fm1_in.notes;
+    ch = keys ^ ui.keys;
+    /* (Pulsar23: no subtracks -- six plain tracks; the shared lanes stay unused) */
+    /* BREAK: the 3rd black key held (the step view off; on the PATTERNS grid too, build 64), the chosen track broken
+     * up (tracks.c); SHIFT and it, every track. Let go, each plays on from where it is */
+    if (!ui.brk && ((ch & keys) >> KEY_TRIG & 1u) && (!step_view() || ui.page == PG_PAT) && !ui.lrec_down) {
+        phrase_brk_roles();
+        brk_seed = next_seed() | 1u;
+        ui.brk = (uint8_t)(sh ? (1u << NTRACK) - 1u : 1u << ui.sel);
+        ui.brk_shown = 0xFF;
+        brk_mask = ui.brk;
+        if (!seq_run)
+            say("NOT PLAYING", 900);
+        else if (brk_keep >> ui.sel & 1u && !sh)
+            say("DRONE: KEPT", 900);
+        ui.force = 1;
+    } else if (ui.brk && (!((keys >> KEY_TRIG) & 1u) || (step_view() && ui.page != PG_PAT))) {
+        ui.brk = 0;
+        brk_mask = 0;
+        if (ui.brk_shown != 0xFFu)
+            ui.msg_until = fm1_ms;               /* (the way's name: gone with it) */
+        ui.force = 1;
+    }
+    if (ui.brk && brk_shown != 0xFFu && (uint8_t)(brk_shown * 16u + brk_shown_w) != ui.brk_shown) {
+        char m[16];                              /* the way playing, for as long as it plays */
+        uint32_t r = brk_shown;
+        ui.brk_shown = (uint8_t)(r * 16u + brk_shown_w);
+        str_cpy(m, BR_NAME[r % NBR], sizeof m);
+        if (r == BR_REPEAT || r == BR_REVERSE) {
+            str_cpy(m + str_len(m), " ", 2);
+            fmt_int(m + str_len(m), brk_shown_w);
+        }
+        say(m, 60000);
+    }
+    if ((ch & keys) >> KEY_EDIT & 1u) {              /* EDIT: the parameter pages, up or down */
+        ui.page = ui.page == PG_EDIT ? PG_MAIN : PG_EDIT;
+        ui.ehalf = ui.lsel = ui.listen = 0;   /* (MIDI LEARN: from A, nothing waited for) */
+        if (ui.edit_pg >= pages_n(cur()))
+            ui.edit_pg = 0;
+        ui.force = 1;
+    }
+    if (ui.lrec_down) {                              /* SHIFT + REC held: the loops on the first three white keys */
+        for (k = 0; k < NKEY; k++)
+            if (((ch & keys) >> k & 1u) && white_ix(k) >= 0 && white_ix(k) < (int32_t)NLOOP && ui.lv_k == KEY_NONE) {
+                ui.lview = ui.lv_any = 1;
+                ui.lv_k = (uint8_t)k;
+                ui.lv_long = 0;
+                ui.lv_t0 = fm1_ms;
+            }
+        if (ui.lv_k != KEY_NONE) {
+            loop_t *p = lp_get(ui.sel, (uint32_t)white_ix(ui.lv_k));
+            char m[12] = "LOOP ";
+            fmt_int(m + 5, white_ix(ui.lv_k) + 1);
+            if (!((keys >> ui.lv_k) & 1u)) {
+                if (!ui.lv_long && p && p->on) {   /* (let go soon: muted, or playing again) */
+                    p->mute = (uint8_t)!p->mute;
+                    str_cpy(m + str_len(m), p->mute ? " MUTE" : " ON", 6);
+                    say(m, 900);
+                }
+                ui.lv_k = KEY_NONE;
+            } else if (!ui.lv_long && (uint32_t)(fm1_ms - ui.lv_t0) >= 800u) {
+                ui.lv_long = 1;                  /* (held: emptied) */
+                if (p != lrp)
+                    lp_free(p);
+                flash("EMPTY", m, C_BAD);
+            }
+        }
+        ui.keys = keys;
+        midi_take();
+        return;
+    }
+    ui.lv_k = KEY_NONE;
+    if (ui.page == PG_PAT) {                         /* the PATTERNS grid: a white key let go soon, its pattern
+                                                      * loaded; held 0.8 s, the pattern playing saved there (build 72);
+                                                      * SHIFT and held, copied -- or, a pattern copied, pasted there
+                                                      * (projects.c); SHIFT and the 1st black key held, pressed, emptied.
+                                                      * The 2nd black key: MUTE mode on or off, as in the track's view
+                                                      * (build 63) */
+        if ((ch & keys) >> KEY_TRK & 1u) {
+            ui.mute_mode = (uint8_t)!ui.mute_mode;
+            ui.tb_down = ui.tb_long = 0;
+            ui.force = 1;
+        }
+        if ((ch & keys) >> KEY_PERF & 1u)            /* (PERFORMANCE on or off here too) */
+            perf_toggle();
+        for (k = 0; k < NKEY; k++) {
+            if (((ch & ~keys) >> k & 1u) && ui.key_track[k] != KEY_NONE) {   /* (a note held from before: let go) */
+                key_off(k);
+                ui.key_track[k] = KEY_NONE;
+            }
+            if (((ch & keys) >> k & 1u) && white_ix(k) >= 0 && ui.qk == KEY_NONE) {
+                ui.qk = (uint8_t)k;
+                ui.qk_long = 0;
+                ui.qk_t0 = fm1_ms;
+                ui.key_track[k] = KEY_NONE;
+                if (sh && (keys >> KEY_GEN & 1u)) {   /* (SHIFT and the 1st black key: emptied, nothing loaded) */
+                    ui.qk_long = 1;
+                    if (perf_on)
+                        say("PERF MODE", 900);
+                    else
+                        pat_clear((uint32_t)white_ix(k));
+                }
+            }
+        }
+        if (ui.qk != KEY_NONE) {
+            if (!((keys >> ui.qk) & 1u)) {
+                if (!ui.qk_long)
+                    pat_switch((uint32_t)white_ix(ui.qk));
+                ui.qk = KEY_NONE;
+            } else if (!ui.qk_long && (uint32_t)(fm1_ms - ui.qk_t0) >= 800u) {
+                ui.qk_long = 1;
+                if (ui.brk)                      /* (a break playing: saved there, build 64) */
+                    pat_brk_save((uint32_t)white_ix(ui.qk));
+                else if ((keys >> KEY_TRIG) & 1u)   /* (the break key held, no break -- stopped: nothing saved) */
+                    ;
+                else if (sh && perf_on)          /* (PERFORMANCE: kept as a pattern only, held alone) */
+                    say("PERF MODE", 900);
+                else if (sh)                     /* (SHIFT: copied, or pasted; build 72) */
+                    pat_copy_hold((uint32_t)white_ix(ui.qk));
+                else                             /* (the pattern playing saved there, build 72) */
+                    pat_save_as((uint32_t)white_ix(ui.qk));
+            }
+        }
+        ui.keys = keys;
+        midi_take();
+        return;
+    }
+    if (ui.page == PG_PRJ) {                         /* the SESSIONS grid: a white key let go soon, its session loaded;
+                                                      * held 0.8 s, the session playing saved there (projects.c) */
+        for (k = 0; k < NKEY; k++) {
+            if (((ch & ~keys) >> k & 1u) && ui.key_track[k] != KEY_NONE) {   /* (a note held from before: let go) */
+                key_off(k);
+                ui.key_track[k] = KEY_NONE;
+            }
+            if (((ch & keys) >> k & 1u) && white_ix(k) >= 0 && white_ix(k) < 16 && ui.qk == KEY_NONE) {
+                ui.qk = (uint8_t)k;
+                ui.qk_long = 0;
+                ui.qk_t0 = fm1_ms;
+                ui.key_track[k] = KEY_NONE;
+            }
+        }
+        if (ui.qk != KEY_NONE) {
+            if (!((keys >> ui.qk) & 1u)) {
+                if (!ui.qk_long)
+                    prj_key_load((uint32_t)white_ix(ui.qk));
+                ui.qk = KEY_NONE;
+            } else if (!ui.qk_long && (uint32_t)(fm1_ms - ui.qk_t0) >= 800u) {
+                ui.qk_long = 1;
+                prj_key_save((uint32_t)white_ix(ui.qk));
+            }
+        }
+        ui.keys = keys;
+        midi_take();
+        return;
+    }
+    ui.qk = KEY_NONE;
+    pat_clip_from = -1;                              /* (off the grid: a pattern copied let go) */
+    if (ui.sk != KEY_NONE) {                         /* SHIFT and a step held 0.8 s: copied, or pasted */
+        if (!((keys >> ui.sk) & 1u))
+            ui.sk = KEY_NONE;
+        else if (!ui.sk_long && (uint32_t)(fm1_ms - ui.sk_t0) >= 800u) {
+            ui.sk_long = 1;
+            step_copy_hold((uint32_t)white_ix(ui.sk));
+        }
+    }
+    if (ui.gen_down) {                               /* the phrase key: let go soon, a new phrase (SHIFT: new locks);
+                                                      * held 0.8 s, the PHRASE page up or down */
+        if (!((keys >> KEY_GEN) & 1u)) {
+            ui.gen_down = 0;
+            if (!ui.gen_long && step_view()) {
+                uint32_t t;
+                if (ui.gen_sh)
+                    phrase_relock(ui.sl);
+                else
+                    phrase_new(ui.sl);
+                for (t = 0; t < NTRACK; t++)         /* (CTRL ALL: each other track's own, on its own steps) */
+                    if (all_too(t)) {
+                        if (ui.gen_sh)
+                            phrase_relock(trk_lane(t));
+                        else
+                            phrase_new(trk_lane(t));
+                    }
+                ui.gen_until = fm1_ms + 400u;
+                flash("NEW", ui.gen_sh ? "LOCKS" : "PHRASE", TRACK_COL[ui.sel]);
+            }
+        } else if (!ui.gen_long && (uint32_t)(fm1_ms - ui.gen_t0) >= 800u) {
+            ui.gen_long = 1;
+            ui.page = ui.page == PG_GEN ? PG_MAIN : PG_GEN;
+            ui.force = 1;
+        }
+    }
+    if (ui.stk_down) {                                /* the STUTTER's key: SHIFT and it held, the stutter plays (in
+                                                      * either order); held alone 0.8 s, its page up or down */
+        if (!((keys >> KEY_STUT) & 1u) || step_view()) {
+            ui.stk_down = 0;
+        } else if (sh && !ui.stk_long) {
+            if (!ui.stk_on) {
+                uint32_t r = next_seed(), q = next_seed();   /* (the page's RND settings: drawn anew, before it
+                                                              * starts -- the seeds' high bits) */
+                stut_pick[0] = (uint8_t)((r >> 16) % ST_SLC_RND);
+                stut_pick[1] = (uint8_t)(r >> 25);
+                stut_pick[2] = (uint8_t)((q >> 16) % ST_MODE_RND);
+                stut_pick[3] = (uint8_t)(q >> 25);
+                ui.stk_on = 1;
+                say("STUTTER", 60000);
+            }
+        } else if (!ui.stk_on && !ui.stk_long && (uint32_t)(fm1_ms - ui.stk_t0) >= 800u) {
+            ui.stk_long = 1;
+            if (ui.page == PG_FXP && ui.fx_pg == FXP_STUT)
+                ui.page = PG_MAIN;
+            else {
+                ui.page = PG_FXP;
+                ui.fx_pg = FXP_STUT;
+                ui.ehalf = ui.lsel = ui.listen = 0;
+            }
+            ui.force = 1;
+        }
+    }
+    if (ui.stk_on && (!ui.stk_down || !sh)) {      /* (either let go: the stutter stops) */
+        ui.stk_on = 0;
+        ui.msg_until = fm1_ms;
+        ui.force = 1;
+    }
+    stut_ui = ui.stk_on;
+    if (ui.ak_down) {                                /* the arpeggiator's key: let go soon, the track's arpeggiator on
+                                                      * or off; held 0.8 s, its page (ARP) up or down */
+        if (!((keys >> KEY_ARP) & 1u)) {
+            ui.ak_down = 0;
+            if (!ui.ak_long) {
+                arp_on[ui.sel] = (uint8_t)!arp_on[ui.sel];
+                if (!arp_on[ui.sel])
+                    ev_post(EV_ARP_CLR, ui.sel, 0, 0);
+                say(arp_on[ui.sel] ? "ARP ON" : "ARP OFF", 900);
+                prj_dirty = 1;
+                ui.force = 1;
+            }
+        } else if (!ui.ak_long && (uint32_t)(fm1_ms - ui.ak_t0) >= 800u) {
+            ui.ak_long = 1;
+            if (ui.page == PG_FXP && fx_arp())
+                ui.page = PG_MAIN;
+            else {
+                ui.page = PG_FXP;
+                ui.fx_pg = FXP_ARP;
+                ui.ehalf = ui.lsel = ui.listen = 0;
+            }
+            ui.force = 1;
+        }
+    }
+    if (((ch & keys) >> KEY_STEP & 1u) && sh) {      /* SHIFT + STEP: the chosen track's steps emptied (the view kept) */
+        if (ui.step_key != KEY_NONE)
+            step_up();
+        steps_clear(ui.sl);
+        say("STEPS CLEARED", 1200);
+        ui.force = 1;
+    } else if ((ch & keys) >> KEY_STEP & 1u) {       /* STEP: the step view on or off */
+        ui.sv = (uint8_t)!ui.sv;
+        if (!ui.sv && ui.step_key != KEY_NONE)
+            step_up();
+        if (!ui.sv)
+            ui.sclip.on = 0;
+        if (!ui.sv && (ui.page == PG_TRK || ui.page == PG_GEN))
+            ui.page = PG_MAIN;
+        ui.force = 1;
+    }
+    for (k = 0; ch && k < NKEY; k++) {
+        if (((ch & keys) >> k & 1u) && !step_view() && k == KEY_GEN && ui.page == PG_MAIN) {   /* CHORD mode on or
+                                                                         * off; SHIFT: the next form (and on) */
+            if (ui.eng[ui.sel] == ENG_BD)
+                say("NO CHORDS", 1000);          /* (DRUM: none) */
+            else if (sh) {
+                if (ui.chord_on[ui.sel])
+                    ui.chord_form[ui.sel] = (uint8_t)((ui.chord_form[ui.sel] + 1u) % CHF_N);
+                ui.chord_on[ui.sel] = 1;
+                say(CH_NAME[ui.chord_form[ui.sel]], 1200);
+            } else {
+                ui.chord_on[ui.sel] = (uint8_t)!ui.chord_on[ui.sel];
+                say(ui.chord_on[ui.sel] ? CH_NAME[ui.chord_form[ui.sel]] : "CHORDS OFF", 1200);
+            }
+            prj_dirty = 1;
+            ui.force = 1;
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && k == KEY_PERF && (step_view() ? sh : !pg_any() || ui.page == PG_PAT)) {   /* PERFORMANCE on or
+                                                                         * off (in the step view: SHIFT with it) */
+            perf_toggle();
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && !step_view() && k == KEY_STUT && !pg_any()) {   /* the STUTTER's key */
+            ui.stk_down = 1;
+            ui.stk_long = 0;
+            ui.stk_t0 = fm1_ms;
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && !step_view() && k == KEY_ARP && !pg_any()) {   /* the arpeggiator's key: on
+                                                                         * its release or held */
+            ui.ak_down = 1;
+            ui.ak_long = 0;
+            ui.ak_t0 = fm1_ms;
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && !step_view() && k == KEY_MOD &&
+            (ui.page == PG_MAIN || ui.page == PG_EDIT || ui.page == PG_FXP)) {   /* MIDI LEARN on or off */
+            learn_toggle();
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && !step_view() && k == KEY_TRK && ui.page == PG_MAIN) {   /* MUTE mode on or
+                                                                         * off (the mutes stay as they are) */
+            ui.mute_mode = (uint8_t)!ui.mute_mode;
+            ui.tb_down = ui.tb_long = 0;
+            say(ui.mute_mode ? "MUTE MODE" : "MUTE OFF", 1000);
+            ui.force = 1;
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && step_view() && k == KEY_TRK) {   /* the TRACK page, up or down */
+            ui.page = ui.page == PG_TRK ? PG_MAIN : PG_TRK;
+            ui.force = 1;
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && step_view() && k == KEY_GEN) {   /* the phrase key: on its release or held */
+            ui.gen_down = 1;
+            ui.gen_long = 0;
+            ui.gen_sh = (uint8_t)sh;
+            ui.gen_t0 = fm1_ms;
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && step_view() && k == KEY_MOD) {   /* MOD on or off (TRIG off) */
+            ui.mod = (uint8_t)!ui.mod;
+            ui.trig = 0;
+            ui.ehalf = ui.lsel = ui.listen = 0;   /* (MIDI LEARN: from A, nothing waited for) */
+            say(ui.mod ? "MOD ON" : "MOD OFF", 700);
+            ui.force = 1;
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && step_view() && k == KEY_TRIG) {   /* TRIG on or off (MOD off) */
+            ui.trig = (uint8_t)!ui.trig;
+            ui.mod = 0;
+            ui.ehalf = ui.lsel = ui.listen = 0;   /* (MIDI LEARN: from A, nothing waited for) */
+            say(ui.trig ? "TRIG ON" : "TRIG OFF", 700);
+            ui.force = 1;
+            continue;
+        }
+        if (((ch & keys) >> k & 1u) && step_view() && (k == KEY_DIR[0] || k == KEY_DIR[1] || k == KEY_DIR[2])) {
+            uint32_t d = k == KEY_DIR[0] ? DIR_REV : k == KEY_DIR[1] ? DIR_PING : DIR_RND;   /* (the track's direction;
+                                                                                         * again: forward) */
+            seq_dir[ui.sl] = (uint8_t)(seq_dir[ui.sl] == d ? DIR_FWD : d);
+            {
+                uint32_t t;
+                for (t = 0; t < NTRACK; t++)         /* (CTRL ALL: the other tracks the same way) */
+                    if (all_too(t))
+                        seq_dir[trk_lane(t)] = seq_dir[ui.sl];
+            }
+            pat_dirty = 1;
+            say(DIR_NAME[seq_dir[ui.sl]], 900);
+            continue;
+        }
+        if (ui.page == PG_FXP && ui.fx_pg == FXP_LR && ((ch >> k) & 1u) && white_ix(k) >= 0) {
+            /* the LOOPER page: white keys 1 .. 6 the tracks' ADD sensors, 9 .. 14 their DEL sensors */
+            int32_t w = white_ix(k);
+            uint32_t on = (keys >> k) & 1u;
+            if (w < (int32_t)NTRACK)
+                ev_post(EV_LR, (uint32_t)w, P23_LR_ADD, on);
+            else if (w >= 8 && w < 8 + (int32_t)NTRACK)
+                ev_post(EV_LR, (uint32_t)w - 8u, P23_LR_DEL, on);
+            continue;
+        }
+        if (!((ch >> k) & 1u) || !key_plays(k))
+            continue;
+        if ((keys >> k) & 1u) {
+            uint32_t note = key_note(k, ui.oct[ui.sl]);
+            ui.key_track[k] = KEY_NONE;
+            if (step_view()) {                       /* the step view: the white keys are the steps (SHIFT: copy, paste) */
+                if (white_ix(k) >= 0 && sh && ui.sk == KEY_NONE) {
+                    ui.sk = (uint8_t)k;
+                    ui.sk_long = 0;
+                    ui.sk_t0 = fm1_ms;
+                } else if (white_ix(k) >= 0 && !sh && ui.step_key == KEY_NONE)
+                    step_down(k);
+                continue;
+            }
+            {   /* the note, or with CHORD mode on the track its chord (the form chosen), from the key's note */
+                uint32_t f1 = ui.chord_on[ui.sel] && ui.eng[ui.sel] != ENG_BD ? ui.chord_form[ui.sel] + 1u : 0u, j,
+                         nn = f1 ? 3u : 1u;   /* (DRUM: never chords) */
+                int32_t c[3] = {(int32_t)note, 0, 0};
+                if (f1)
+                    chord_of((int32_t)note, f1 - 1u, c);
+                ui.key_track[k] = ui.sl;          /* (the lane: the track's subtrack chosen) */
+                ui.key_note[k] = (uint8_t)note;
+                ui.last_note[ui.sl] = (uint8_t)note;
+                ui.last_chf[ui.sl] = (uint8_t)f1;
+                ui.key_cn[k][0] = ui.key_cn[k][1] = ui.key_cn[k][2] = 0;
+                ui.key_arp[k] = arp_on[ui.sel];  /* (the arpeggiator on: the notes its, what it plays recorded) */
+                for (j = 0; j < nn; j++) {
+                    ui.key_cn[k][j] = (uint8_t)c[j];
+                    ev_post(ui.key_arp[k] ? EV_ARP_ON : EV_ON, ui.sl, (uint32_t)c[j], 127);
+                }
+                if (!ui.key_arp[k] && ui.sl < NTRACK)
+                    ev_post(EV_LR, ui.sl, P23_LR_ADD, 1);   /* (the keys are the track's ADD sensor too) */
+                if (!ui.key_arp[k]) {
+                    rec_note(note, 127, k, f1);  /* (a step holds the chord as its root and form) */
+                    loop_note(ui.key_cn[k], nn, 127, k);   /* (a loop: its notes) */
+                }
+            }
+        } else if (k == ui.step_key)
+            step_up();
+        else if (ui.key_track[k] != KEY_NONE) {
+            key_off(k);
+            ui.key_track[k] = KEY_NONE;
+            if (ui.rec_step[k] != 0xFFu)
+                rec_release(k);
+            if (ui.lk_ev[k] != 0xFFFFu)
+                loop_release(k);
+        }
+    }
+    ui.keys = keys;
+    midi_take();
+}
+
+/* ------------------------------------------------------------- LEDs --- */
+static void led_dim_key(uint32_t id, int on)
+{
+    uint32_t p, r;
+    for (p = 0; p < FM1_NCOL; p++)
+        for (r = 1; r < 5u; r++)
+            if (FM1_KEYMAP[r][p] == (int8_t)id) {
+                if (on)
+                    fm1_led_dim[p] |= (uint8_t)(1u << r);
+                else
+                    fm1_led_dim[p] &= (uint8_t)~(1u << r);
+            }
+}
+static void ui_leds(void)
+{
+    uint32_t t, k, ht;
+    sel_sync();
+    for (t = 0; t < NTRACK; t++) {
+        if (ui.mute_mode) {                          /* (MUTE mode: playing lit, muted dim) */
+            uint32_t mu = trk_mute[t] != 0;
+            if ((seq_mq & 0x80u) && (seq_mq >> t & 1u) != mu)   /* (MUTE QT: waiting to change, blinking) */
+                mu = (fm1_ms / 150u) & 1u;
+            fm1_led_key(PANEL_BTN[TRACK_BTN[t]], !mu);
+            led_dim_key(PANEL_BTN[TRACK_BTN[t]], mu);
+            continue;
+        }
+        fm1_led_key(PANEL_BTN[TRACK_BTN[t]], t == ui.sel);
+        led_dim_key(PANEL_BTN[TRACK_BTN[t]], trk_sounding(t));
+    }
+    fm1_led_key(PANEL_BTN[B_HOME], (int32_t)(ui.home_until - fm1_ms) > 0);
+    fm1_led_key(PANEL_BTN[B_SEQ], ui.page == PG_FXP && !fx_arp());
+    fm1_led_key(PANEL_BTN[B_ARP], ui.page == PG_SCALE);
+    fm1_led_key(PANEL_BTN[B_SAVE], ui.page == PG_PRJ || ui.page == PG_PRJD || ui.page == PG_SET || ui.page == PG_PAT);
+    fm1_led_key(PANEL_BTN[B_OCTDN], ui.page == PG_EDIT || (step_view() ? ui.trn[ui.sl] < 0 : ui.oct[ui.sl] < 0));
+    fm1_led_key(PANEL_BTN[B_OCTUP], ui.page == PG_EDIT || (step_view() ? ui.trn[ui.sl] > 0 : ui.oct[ui.sl] > 0));
+    fm1_led_key(PANEL_BTN[B_REC], ui.rec == REC_ON || ui.lrec == 2 ||
+                                      ((ui.rec == REC_ARMED || ui.lrec == 1) && (fm1_ms / 250u) & 1u));
+    fm1_led_key(PANEL_BTN[B_PLAY], seq_run && (seq_pos[ui.sl] & 3u) == 0u);   /* (the beat, while it plays) */
+    ht = NTRACK;                                 /* (build 79) a DRUM track's button held: its subtracks on white keys
+                                                  * 1 .. 4 (the chosen lit; ST-A and the ones taken dim), the others dark */
+    for (t = 0; t < NTRACK; t++)
+        if (btn_bit(fm1_in.buttons, TRACK_BTN[t]) && !ui.mute_mode && trk_lanes(t))
+            ht = t;
+    for (k = 0; k < NKEY; k++) {
+        if (ht < NTRACK && k != KEY_SHIFT) {
+            int32_t w = white_ix(k);
+            int in = w >= 0 && w < (int32_t)NSUB;
+            fm1_led_key(14u + k, in && (uint32_t)w == ui.sub[ht]);
+            led_dim_key(14u + k, in && (!w || lane_find(ht, (uint32_t)w) < NLANE));
+            continue;
+        }
+        if (ui.lrec_down && white_ix(k) >= 0) {      /* (the loops: playing lit, muted dim) */
+            int32_t w = white_ix(k);
+            const loop_t *p = w < (int32_t)NLOOP ? lp_get(ui.sel, (uint32_t)w) : 0;
+            fm1_led_key(14u + k, p && p->on && !p->mute);
+            led_dim_key(14u + k, p && p->on && p->mute);
+            continue;
+        }
+        if (ui.page == PG_PRJ && white_ix(k) >= 0) {   /* (the SESSIONS grid: the page's sixteen dim, the one playing
+                                                        * lit) */
+            int32_t w = white_ix(k);
+            fm1_led_key(14u + k, w < 16 && prj_key_lit((uint32_t)w));
+            led_dim_key(14u + k, w < 16);
+            continue;
+        }
+        if (ui.page == PG_PAT && white_ix(k) >= 0) {   /* (the PATTERNS grid: every white key a pattern, dim; the playing
+                                                        * one lit) */
+            fm1_led_key(14u + k, white_ix(k) == pat_clip_from || (seq_pend == 1u && white_ix(k) == seq_pend_k)
+                                     ? (fm1_ms / 250u) & 1u   /* (the one copied, the one waiting to play: blink) */
+                                     : white_ix(k) == (int32_t)pat_cur && seq_pend != 1u);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (!step_view() && k == KEY_MOD) {     /* (the MIDI LEARN key: lit while on, dim) */
+            fm1_led_key(14u + k, ui.learn);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if ((!step_view() || ui.page == PG_PAT) && k == KEY_TRIG) {   /* (the BREAK key: lit while held, dim) */
+            fm1_led_key(14u + k, ui.brk != 0);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (k == KEY_TRK && (ui.page == PG_PAT || (ui.page == PG_MAIN && !step_view()))) {   /* (the MUTE key: lit
+                                                                         * while on, dim off) */
+            fm1_led_key(14u + k, ui.mute_mode);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (!step_view() && k == KEY_STUT && !pg_any()) {   /* (the STUTTER key: dim, lit while it plays or its
+                                                             * page is up) */
+            fm1_led_key(14u + k, ui.stk_on || (ui.page == PG_FXP && ui.fx_pg == FXP_STUT));
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (!step_view() && k == KEY_PERF && (!pg_any() || ui.page == PG_PAT)) {   /* (PERFORMANCE: dim, lit while
+                                                                                   * on) */
+            fm1_led_key(14u + k, perf_on);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (!step_view() && k == KEY_ARP && !pg_any()) {   /* (the ARP key: lit while on, dim off) */
+            fm1_led_key(14u + k, arp_on[ui.sel]);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (!step_view() && k == KEY_GEN && ui.page == PG_MAIN) {   /* (the CHORD key: lit while on, dim off) */
+            fm1_led_key(14u + k, ui.chord_on[ui.sel] && ui.eng[ui.sel] != ENG_BD);
+            led_dim_key(14u + k, 1);                 /* (dim on every track: the key has a use here) */
+            continue;
+        }
+        if (step_view() && k == KEY_GEN) {           /* (the phrase key: dim, lit as it makes one) */
+            fm1_led_key(14u + k, (int32_t)(ui.gen_until - fm1_ms) > 0 || ui.page == PG_GEN);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (step_view() && k == KEY_MOD) {           /* (MOD: dim, lit while on) */
+            fm1_led_key(14u + k, ui.mod);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (step_view() && k == KEY_TRIG) {          /* (TRIG: dim, lit while on) */
+            fm1_led_key(14u + k, ui.trig);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (step_view() && (k == KEY_DIR[0] || k == KEY_DIR[1] || k == KEY_DIR[2])) {   /* (the directions: the one
+                                                                                     * the track goes lit) */
+            uint32_t d = k == KEY_DIR[0] ? DIR_REV : k == KEY_DIR[1] ? DIR_PING : DIR_RND;
+            fm1_led_key(14u + k, seq_dir[ui.sl] == d);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (step_view() && k == KEY_TRK) {           /* (the TRACK key: dim, lit while its page is up) */
+            fm1_led_key(14u + k, ui.page == PG_TRK);
+            led_dim_key(14u + k, 1);
+            continue;
+        }
+        if (step_view() && white_ix(k) >= 0) {       /* (the step view: with a note lit, empty dim, the one playing
+                                                      * the other way round; past the track's length, dark) */
+            uint32_t i = (uint32_t)white_ix(k), len = seq_len[ui.sl] ? seq_len[ui.sl] : NSTEP;
+            int on = seq_note[ui.sl][i] != 0;
+            if (seq_run && seq_pos[ui.sl] == i)
+                on = !on;
+            if (ui.sclip.on && ui.sclip.t == ui.sel && ui.sclip.i == i)
+                on = (fm1_ms / 250u) & 1u;           /* (the step copied: blinks) */
+            fm1_led_key(14u + k, i < len && (on || k == ui.step_key));
+            led_dim_key(14u + k, i < len);
+            continue;
+        }
+        led_dim_key(14u + k, key_plays(k) && (key_note(k, 0) + 120u - ui.root) % 12u == 0u);   /* (the root, dim:
+                                                                                         * build 72) */
+        fm1_led_key(14u + k, key_plays(k) && ((ui.keys >> k) & 1u) && ui.key_track[k] == ui.sl);
+    }
+    fm1_led_key(14u + KEY_SHIFT, (ui.keys >> KEY_SHIFT) & 1u);
+    fm1_led_key(14u + KEY_STEP, ui.sv);
+    led_dim_key(14u + KEY_STEP, 1);
+    fm1_led_key(14u + KEY_EDIT, ui.page == PG_EDIT);
+    led_dim_key(14u + KEY_EDIT, 1);
+}
+
+/* ----------------------------------------------------------- screen --- */
+/* QUASAR's track view: a status line (BAND_A), the track's bar in its colour with its number and engine profile
+ * (BAND_B), the sound's family (BAND_C), its four macros as bars (BAND_E), a segmented level meter (BAND_M) and a
+ * pan line (BAND_D) */
+#define BAND_A 0
+#define BAND_B 28
+#define BAND_C 82
+#define BAND_E 128
+#define BAND_M 190
+#define BAND_D 218
+
+/* the battery (build 56): ADC 3, the cell's divider, smoothed (main.c; 0 not read yet); its level 0 .. 3 by
+ * MELODEE's thresholds (531, 561, 591). On a USB host's power the divider reads the supply, not the charge: a bolt */
+static int32_t batt_raw;
+static int32_t batt_level(void) { return batt_raw >= 591 ? 3 : batt_raw >= 561 ? 2 : batt_raw >= 531 ? 1 : 0; }
+static int32_t batt_key(void)                    /* what the battery shows: -1 none, 0 .. 3 its level, 4 USB */
+{
+    if (!batt_raw)
+        return -1;
+    return usb.config && !usb.suspended ? 4 : batt_level();
+}
+/* a small battery, right edge at x, its top at y (21 x 10): green with three bars full, two; amber with one; red,
+ * empty; a USB host's power: green, a white bolt in it */
+static int32_t draw_batt(int32_t x, int32_t y)
+{
+    int32_t k = batt_key(), i, w = 18, h = 10, x0 = x - w - 3;
+    uint16_t c = k == 1 ? RGB(255, 170, 0) : k == 0 ? C_BAD : C_OK;
+    if (k < 0)
+        return x;
+    cv_rect(x0, y, w, 2, c);                     /* (its case: 2 px) */
+    cv_rect(x0, y + h - 2, w, 2, c);
+    cv_rect(x0, y, 2, h, c);
+    cv_rect(x0 + w - 2, y, 2, h, c);
+    cv_rect(x0 + w, y + 3, 3, h - 6, c);         /* (its tip) */
+    if (k == 4) {                                /* (a bolt) */
+        cv_rect(x0 + 8, y + 2, 3, 3, C_WHITE);
+        cv_rect(x0 + 6, y + 4, 6, 2, C_WHITE);
+        cv_rect(x0 + 7, y + 5, 3, 3, C_WHITE);
+    } else
+        for (i = 0; i < (k ? k : 1); i++)        /* (empty: one bar, red) */
+            cv_rect(x0 + 3 + i * 4, y + 3, 3, h - 6, c);
+    return x0 - 8;
+}
+/* the status line: the pattern (orange: changes not saved; a pattern waiting: the two in turn), CHORD's form, ARP,
+ * the octave and transposition, REC / LOOP / ARM, the battery */
+static void draw_number(void)
+{
+    uint16_t tc = trk_mute[ui.sel] ? RGB(80, 80, 80) : TRACK_COL[ui.sel];
+    cv_begin(240, BAND_B - BAND_A, C_BLACK);
+    {
+        char pn[8] = "P";
+        int32_t x;
+        fmt_int(pn + 1, (seq_pend == 1u && (fm1_ms / 300u) & 1u ? seq_pend_k : pat_cur) + 1);
+        x = cv_text(4, 0, &FONT_S, pn, pat_dirty ? RGB(255, 140, 0) : C_WHITE) + 10;
+        if (perf_on)                             /* (PERFORMANCE: what changes is given back) */
+            x = cv_text(x, 0, &FONT_S, "PERF", C_BAD) + 10;
+        if (ui.chord_on[ui.sel] && ui.eng[ui.sel] != ENG_BD)
+            x = cv_text(x, 0, &FONT_S, CH_ABBR[ui.chord_form[ui.sel] % CHF_N], tc) + 10;
+        if (arp_on[ui.sel])
+            x = cv_text(x, 0, &FONT_S, "ARP", tc) + 10;
+        if (ui.rec || ui.lrec) {
+            const char *r = ui.lrec == 2 ? "LOOP" : ui.rec == REC_ON ? "REC" : "ARM";
+            x = cv_text(x, 0, &FONT_S, r, ui.lrec == 2 || ui.rec == REC_ON ? C_BAD : RGB(255, 140, 0)) + 10;
+        }
+        (void)x;
+    }
+    {
+        int32_t x = draw_batt(237, 2 + ((int32_t)FONT_S.h - 10) / 2);
+        if (ui.oct[ui.sl]) {
+            char o[4] = {ui.oct[ui.sl] < 0 ? '-' : '+', (char)('0' + (ui.oct[ui.sl] < 0 ? -ui.oct[ui.sl] : ui.oct[ui.sl])), 0, 0};
+            x -= text_w(&FONT_S, o);
+            cv_text(x, 0, &FONT_S, o, C_WHITE);
+            x -= 8;
+        }
+        if (ui.trn[ui.sl]) {
+            char o[8] = "T";
+            trn_text(o + 1, ui.trn[ui.sl]);
+            cv_text(x - text_w(&FONT_S, o), 0, &FONT_S, o, tc);
+        }
+    }
+    cv_blit(0, BAND_A);
+}
+/* the track's bar: its colour (grey while muted), a black notch holding the track's number, the engine profile in
+ * black beside it, and a thin rule under it */
+static void draw_engine(void)
+{
+    const char *e = PROFILES[prof_of(cur())].name;
+    char d[2] = {(char)('1' + ui.sel), 0};
+    uint16_t tc = trk_mute[ui.sel] ? RGB(80, 80, 80) : TRACK_COL[ui.sel];
+    const font_t *f = text_w(&FONT_L, e) <= 150 ? &FONT_L : text_w(&FONT_M, e) <= 170 ? &FONT_M : &FONT_S;
+    cv_begin(240, BAND_C - BAND_B, C_BLACK);
+    cv_rect(0, 2, 240, 48, tc);
+    cv_rect(6, 6, 44, 40, C_BLACK);                  /* (the notch) */
+    cv_bg_set(C_BLACK);
+    cv_text(6 + (44 - text_w(&FONT_L, d)) / 2, 6 + (40 - (int32_t)FONT_L.h) / 2, &FONT_L, d, tc);
+    cv_bg_set(tc);
+    cv_text(60, 2 + (48 - (int32_t)f->h) / 2, f, e, C_BLACK);
+    cv_rect(0, 52, 240, 2, tc);
+    cv_blit(0, BAND_B);
+}
+static const font_t *band_font(const char *s)
+{
+    return text_w(&FONT_M, s) - 6 * ((int32_t)str_len(s) - 1) <= 228 ? &FONT_M : &FONT_S;
+}
+/* the sound's family, left, in the track's colour (a message: black on white, as before) */
+static void draw_sound(const char *name, int message)
+{
+    uint16_t fg = message ? C_BLACK : TRACK_COL[ui.sel];
+    const font_t *f = band_font(name);
+    cv_begin(240, BAND_E - BAND_C, message ? C_WHITE : C_BLACK);
+    if (message || text_w(f, name) > 228)
+        cv_text_fit((BAND_E - BAND_C - (int32_t)f->h) / 2, f, name, fg);
+    else
+        cv_text(6, (BAND_E - BAND_C - (int32_t)f->h) / 2, f, name, fg);
+    cv_blit(0, BAND_C);
+}
+/* the four macros (KNOB 1 .. 4): each its name, small, and a bar from the bottom; the recipe's middle marked */
+static int32_t mac_key(void)
+{
+    const sound_t *sn = cur();
+    int32_t k = (int32_t)sn->mach * 7 + (int32_t)TRACK_COL[ui.sel], j;
+    for (j = 0; j < 4; j++)
+        k = k * 131 + par_val(sn, PG_MACRO, (uint32_t)j);
+    return k;
+}
+static void draw_macros(void)
+{
+    const sound_t *sn = cur();
+    uint16_t tc = TRACK_COL[ui.sel];
+    int32_t j, h = BAND_M - BAND_E - 4;
+    CV_AREA(0, BAND_E, 240, (uint32_t)h, C_BLACK) {
+        for (j = 0; j < 4; j++) {   /* (a 2 x 2 grid: KNOB 1 2 above, 3 4 below) */
+            par_t p;
+            int32_t x = 6 + (j & 1) * 118, y = (j >> 1) * (h / 2), v = clampi(par_val(sn, PG_MACRO, (uint32_t)j), 0, 127);
+            int32_t by = y + 20, bw = 110;
+            par_get(sn, PG_MACRO, (uint32_t)j, &p);
+            cv_text(x, y, &FONT_XS, p.name, RGB(160, 160, 160));
+            cv_rect(x, by, bw, 6, RGB(40, 40, 40));
+            if (v)
+                cv_rect(x, by, v * bw / 127, 6, tc);
+            cv_rect(x + bw / 2 - 1, by - 2, 2, 10, C_WHITE);   /* (the recipe as drawn: the middle) */
+        }
+    }
+    ui.shown_mac = mac_key();
+}
+#define METER_X 6
+#define METER_LEN 228
+#define METER_SEG 19                                 /* (twelve segments of 19 px, a gap of 2 between them) */
+static int32_t meter_px_db10(int32_t db10) { return clampi((db10 + 480) * METER_LEN / 540, 0, METER_LEN); }
+static int32_t meter_px(int32_t peak)
+{
+    if (peak < 130)
+        return 0;
+    return meter_px_db10((int32_t)(((int64_t)(log2_q16((uint32_t)peak) - (15 << 16)) * 602) >> 16) / 10);
+}
+/* the level: segments lit as far as the peak (the last three amber, red), the level set a white tick above them */
+static void draw_meter(int32_t px)
+{
+    int32_t lv = ui.level[ui.sl], i, n = METER_LEN / METER_SEG;
+    cv_begin(240, BAND_D - BAND_M, C_BLACK);
+    for (i = 0; i < n; i++) {
+        int32_t x = METER_X + i * METER_SEG, lit = x + METER_SEG / 2 <= METER_X + px;
+        uint16_t on = i >= n - 1 ? C_BAD : i >= n - 3 ? RGB(255, 170, 0) : TRACK_COL[ui.sel];
+        cv_rect(x, 8, METER_SEG - 2, 14, lit ? on : RGB(40, 40, 40));
+    }
+    if (lv)
+        cv_rect(METER_X + meter_px_db10((lv - LEVEL_UNITY) * 15 - 150) - 1, 0, 3, 6, C_WHITE);
+    else
+        cv_rect(METER_X, 0, METER_LEN, 3, C_BAD);   /* (the level off: a red line) */
+    cv_blit(0, BAND_M);
+    ui.shown_meter = px;
+    ui.shown_level = lv;
+}
+/* the pan: a thin line, its centre marked, the position a small block in the track's colour */
+static void draw_pan(void)
+{
+    int32_t pn = ui.pan[ui.sl], x = 120 + pn * 108 / PAN_MAX;
+    cv_begin(240, 240 - BAND_D, C_BLACK);
+    cv_rect(6, 10, 228, 2, RGB(70, 70, 70));
+    cv_rect(119, 6, 2, 10, RGB(140, 140, 140));
+    cv_rect(x - 6, 4, 12, 14, TRACK_COL[ui.sel]);
+    cv_blit(0, BAND_D);
+    ui.shown_pan = pn;
+}
+
+/* a page of four rows (EDIT, the effects): a title, then each row its name and value, a bar under them; the
+ * row just turned black on white */
+static void draw_rows_title(const char *t1, const char *t2, uint16_t col)
+{
+    cv_begin(240, 52, C_BLACK);
+    if (text_w(&FONT_M, t1) + text_w(&FONT_S, t2) + 16 <= 232)   /* the page, large; where it is (2/8, A-D), right */
+        cv_text(4, 4, &FONT_M, t1, col);
+    else                                              /* (both not fitting: the page smaller) */
+        cv_text(4, 4 + ((int32_t)FONT_M.h - (int32_t)FONT_S.h) / 2, &FONT_S, t1, col);
+    cv_text(236 - text_w(&FONT_S, t2), 4 + ((int32_t)FONT_M.h - (int32_t)FONT_S.h) / 2, &FONT_S, t2, C_WHITE);
+    cv_rect(4, 46, 232, 2, RGB(60, 60, 60));
+    cv_rect(ui.half ? 120 : 4, 46, 116, 4, col);      /* (which half: A .. D left, E .. H right) */
+    cv_blit(0, 0);
+}
+/* a row: the name left, the value right -- every page's names in one size (XS), the values in the next (S), a value
+ * too wide beside its name in the names' size (the pages' rows the same everywhere) */
+static void draw_row(uint32_t r, const char *name, const char *val, int32_t frac, int bip, int touched, uint16_t col)
+{
+    uint16_t bg = touched ? C_WHITE : C_BLACK, fg = touched ? C_BLACK : C_WHITE;
+    const font_t *fn = &FONT_XS, *fv = text_w(&FONT_XS, name) + text_w(&FONT_S, val) + 12 <= 228 ? &FONT_S : &FONT_XS;
+    cv_begin(240, 47, bg);
+    if (name[0]) {
+        cv_text(6, 1 + (FONT_M.h - fn->h) / 2, fn, name, touched ? C_BLACK : row_tint ? row_tint : RGB(200, 200, 200));
+        cv_text(234 - text_w(fv, val), 1 + (FONT_M.h - fv->h) / 2, fv, val,
+                row_learn ? (touched ? C_LEARN_ON : C_LEARN) : touched || !row_tint ? fg : row_tint);
+        if (!row_learn) {                        /* (MIDI LEARN: no value, so no bar) */
+            cv_rect(6, 38, 228, 6, touched ? C_GREY : RGB(60, 60, 60));
+            if (bip) {
+                int32_t x0 = 120, x1 = 6 + frac * 228 / 1000;
+                cv_rect(x1 < x0 ? x1 : x0, 38, absi(x1 - x0) + 2, 6, touched ? C_BLACK : col);
+            } else
+                cv_rect(6, 38, frac * 228 / 1000, 6, touched ? C_BLACK : col);
+        }
+    }
+    cv_blit(0, 52 + 47 * r);
+}
+static void draw_edit_page(void)
+{
+    const sound_t *s = cur();
+    uint32_t id = page_id(s, ui.edit_pg), j, st = step_held() ? (uint32_t)white_ix(ui.step_key) : 0xFFu;
+    int32_t t = (int32_t)(ui.touch_until - fm1_ms) > 0 ? ui.touched : -1;
+    int lrn = ui.learn && st >= NSTEP;           /* (MIDI LEARN: the CCs, not the values) */
+    int full = ui.force || ui.shown_page != PG_EDIT || ui.shown_half != ui.half || ui.shown_sub != ui.edit_pg ||
+               ui.shown_step != st || ui.shown_learn != lrn;
+    ui.shown_step = (uint8_t)st;
+    ui.shown_learn = (uint8_t)lrn;
+    if (full) {
+        char t1[16], t2[16];
+        page_title(s, id, t1);
+        t2[0] = 0;
+        if (st < NSTEP) {                            /* (a step held: S5 3/8, its values) */
+            str_cpy(t2, "S", 2);
+            fmt_int(t2 + 1, (int32_t)st + 1);
+            str_cpy(t2 + str_len(t2), " ", 2);
+        }
+        fmt_int(t2 + str_len(t2), ui.edit_pg + 1);  /* 3/8 */
+        str_cpy(t2 + str_len(t2), "/", 2);
+        fmt_int(t2 + str_len(t2), (int32_t)pages_n(s));
+        if (lrn)                                 /* (MIDI LEARN: CC in the page count's place -- the column shows
+                                                  * CCs) */
+            str_cpy(t2, "CC", 8);
+        draw_rows_title(t1, t2, TRACK_COL[ui.sel]);
+    }
+    if (lrn) {
+        for (j = 0; j < 4u; j++) {
+            uint32_t k = j + 4u * ui.half;
+            par_t p;
+            char b[8];
+            int cc = learn_of(LK_SND, ui.sel, id * 8u + k), w = ui.listen && k == ui.lsel;
+            int32_t key = 1000000 + (cc >= 0 ? mlearn[cc].cc : 200) + (k == ui.lsel) * 1000 + w * 2000;
+            if (!full && ui.shown_rows[j] == key)
+                continue;
+            par_get(s, id, k, &p);
+            if (w)
+                str_cpy(b, "WAIT", 6);
+            else if (cc >= 0)
+                fmt_int(b, mlearn[cc].cc);
+            else
+                str_cpy(b, p.kind == PK_NONE ? "" : "--", 4);
+            row_learn = 1;
+            draw_row(j, p.kind == PK_NONE ? "" : p.name, b, 0, 0, k == ui.lsel && p.kind != PK_NONE, TRACK_COL[ui.sel]);
+            row_learn = 0;
+            ui.shown_rows[j] = key;
+        }
+        ui.shown_touch = -1;
+        ui.shown_half = ui.half;
+        ui.shown_sub = ui.edit_pg;
+        return;
+    }
+    for (j = 0; j < 4u; j++) {
+        par_t p;
+        int32_t v;
+        char b[16];
+        uint32_t pid = id * 8u + j + 4u * ui.half;
+        int locked = st < NSTEP && pl_find(ui.sl, st, pid) >= 0;
+        par_get(s, id, j + 4u * ui.half, &p);
+        v = st < NSTEP ? pl_val(ui.sl, st, pid) : par_val(s, id, j + 4u * ui.half);
+        if (!full && ui.shown_rows[j] == v + locked * 100000 && ((int32_t)j == t) == ((int32_t)j == ui.shown_touch))
+            continue;
+        par_text(&p, v, b);
+        draw_row(j, p.kind == PK_NONE ? "" : p.name, b, p.hi > p.lo ? (v - p.lo) * 1000 / (p.hi - p.lo) : 0,
+                 p.kind == PK_BIP, (int32_t)j == t, st < NSTEP && !locked ? C_GREY : TRACK_COL[ui.sel]);
+        ui.shown_rows[j] = v + locked * 100000;   /* (a step held: its bar grey where it plays the sound's own) */
+    }
+    ui.shown_touch = (int8_t)t;
+    ui.shown_half = ui.half;
+    ui.shown_sub = ui.edit_pg;
+}
+static void lfo_mult_text(char *b, uint32_t m)  /* MULT: x1 .. x2048 with the tempo; .1 .. .2048 at 120 BPM */
+{
+    str_cpy(b, m < 12u ? "x" : ".", 2);
+    fmt_int(b + 1, (int32_t)(1u << (m % 12u)));
+}
+static void fx_text(uint32_t k, int32_t x, char *b)   /* an effect's parameter k, as it reads */
+{
+    if (fx_arp() && k < NARP && fx_kind(k) == 3u) {
+        if (k == AR_MODE)
+            str_cpy(b, AMN[x % NAM], 10);
+        else if (k == AR_RATE)
+            str_cpy(b, ARATE[x % NAR_RATE], 8);
+        else if (k == AR_RNG) {
+            fmt_int(b, x % NAR_RNG + 1);
+            str_cpy(b + str_len(b), " OCT", 6);
+        } else if (k == AR_LATCH)
+            str_cpy(b, x ? "ON" : "OFF", 4);
+        else if (x % NAR_BASS) {
+            str_cpy(b, "EVERY ", 8);
+            fmt_int(b + 6, x % NAR_BASS + 1);
+        } else
+            str_cpy(b, "OFF", 4);
+    } else if (fx_lfo() && k < NLF) {
+        if (k == LF_DEST) {
+            lfo_dest_text(cur(), (uint32_t)x, b);
+            if (text_w(&FONT_XS, "DEST") + text_w(&FONT_XS, b) + 12 > 228 && b[0] && b[1] && b[2] && str_has(b, " "))
+                str_cpy(b, b + (b[2] == ' ' ? 3 : 4), 20);   /* (too wide: the name alone, its page dropped) */
+        }
+        else if (k == LF_MULT)
+            lfo_mult_text(b, (uint32_t)x % NLMULT);
+        else if (k == LF_WAVE || k == LF_MODE)
+            str_cpy(b, k == LF_WAVE ? LWN[x % NLW] : LMN[x % NLM], 8);
+        else if (k == LF_SPH)
+            fmt_int(b, x);
+        else {
+            str_cpy(b, x > 64 ? "+" : "", 2);
+            fmt_int(b + str_len(b), x - 64);
+        }
+    } else if (fx_pnl() && fx_kind(k) == 3u)
+        str_cpy(b, pn_row(k)->list[clampi(x, 0, pn_row(k)->n - 1)], 10);
+    else if (fx_pnl() && fx_kind(k) == 9u && x >= (int32_t)ST_VAL_RND)
+        str_cpy(b, "RND", 4);
+    else if (fx_patch() && k == 0) {
+        fmt_int(b, x + 1);
+        str_cpy(b + str_len(b), "/32", 4);
+    } else if (fx_patch() && k < 3u)
+        pin_name((uint32_t)x, b);
+    else if (fx_patch()) {                       /* (the cable's net, in volts and tenths) */
+        int32_t dv = x * 100 / P23_VOLT;
+        b[0] = 0;
+        if (dv < 0) {
+            str_cpy(b, "-", 2);
+            dv = -dv;
+        }
+        fmt_int(b + str_len(b), dv / 10);
+        str_cpy(b + str_len(b), ".", 2);
+        fmt_int(b + str_len(b), dv % 10);
+        str_cpy(b + str_len(b), "V", 2);
+    } else if (ui.fx_pg == FXP_CMP && fx_kind(k) == 3u)
+        sc_name((uint32_t)x, b);
+    else if (fx_kind(k) == 2u) {
+        int32_t d = bip_disp(x);
+        str_cpy(b, d > 0 ? "+" : "", 2);
+        fmt_int(b + str_len(b), d);
+    } else
+        fmt_int(b, pct_disp(x));
+}
+static const char *fx_name(uint32_t k)
+{
+    static const char *const PCN[4] = {"CABLE", "FROM", "TO", "VOLTS"};
+    if (fx_pnl()) return pn_row(k)->name;
+    if (fx_patch()) return PCN[k & 3u];
+    return fx_arp() ? ARN[k] : fx_lfo() ? LFN[k] : CPN[k & 1u];
+}
+static void draw_fx_page(void)
+{
+    uint32_t j;
+    int32_t t = (int32_t)(ui.touch_until - fm1_ms) > 0 ? ui.touched : -1;
+    uint32_t sub = ui.fx_pg + 100u + (ui.fx_pg == FXP_CMP || fx_lfo() || fx_arp() ? 10u * ui.sel : 0u);   /* (COMP, LFOs: the
+                                                                                    * chosen track's too) */
+    int lrn = ui.learn;                          /* (MIDI LEARN: the CCs, not the values) */
+    int full = ui.force || ui.shown_page != PG_FXP || ui.shown_half != ui.half || ui.shown_sub != sub ||
+               ui.shown_learn != lrn;
+    ui.shown_learn = (uint8_t)lrn;
+    if (full)
+        draw_rows_title(FXT[ui.fx_pg], lrn ? "CC" : ui.half ? "E-H" : "A-D",
+                        fx_lfo() || fx_arp() ? TRACK_COL[ui.sel] : C_SEND);
+    if (lrn) {
+        for (j = 0; j < 4u; j++) {
+            uint32_t k = j + 4u * ui.half;
+            char b[8];
+            int has = k < fx_n(), cc = has ? learn_of(LK_FX, ui.sel, ui.fx_pg * 8u + k) : -1, w = ui.listen && k == ui.lsel;
+            int32_t key = 1000000 + (cc >= 0 ? mlearn[cc].cc : 200) + (k == ui.lsel) * 1000 + w * 2000;
+            if (!full && ui.shown_rows[j] == key)
+                continue;
+            if (w)
+                str_cpy(b, "WAIT", 6);
+            else if (cc >= 0)
+                fmt_int(b, mlearn[cc].cc);
+            else
+                str_cpy(b, has ? "--" : "", 4);
+            row_learn = 1;
+            draw_row(j, has ? fx_name(k) : "", b, 0, 0, k == ui.lsel && has, C_SEND);
+            row_learn = 0;
+            ui.shown_rows[j] = key;
+        }
+        ui.shown_touch = -1;
+        ui.shown_half = ui.half;
+        ui.shown_sub = (uint8_t)sub;
+        return;
+    }
+    for (j = 0; j < 4u; j++) {
+        uint32_t k = j + 4u * ui.half;
+        char b[24];                              /* (an LFO's DEST: its page, then a name of up to 15) */
+        const char *name = k < fx_n() ? fx_name(k) : "";
+        int32_t x = k < fx_n() ? fx_get(k) : 0;
+        if (!full && ui.shown_rows[j] == x && ((int32_t)j == t) == ((int32_t)j == ui.shown_touch))
+            continue;
+        fx_text(k, x, b);
+        row_tint = ui.fx_pg == FXP_CMP && k < fx_n() ? TRACK_COL[ui.sel]   /* (the chosen track's, in its colour) */
+                   : fx_pnl() && k < fx_n() && pn_row(k)->idx == PNR_LRMODE ? TRACK_COL[ui.sel] : 0;
+        draw_row(j, name, b,
+                 k < fx_n() && fx_kind(k) == 3u ? x * 1000 / (int32_t)(fx_list_n(k) - 1u)
+                 : k < fx_n() && fx_kind(k) == 5u ? x * 1000 / (int32_t)(LFO_ND - 1u)
+                 : k < fx_n() && fx_kind(k) == 6u ? x * 1000 / (int32_t)(P23_PINS - 1u)
+                 : k < fx_n() && fx_kind(k) == 7u ? x * 1000 / (int32_t)(NPCAB - 1u)
+                 : k < fx_n() && fx_kind(k) == 8u ? clampi(x, 0, P23_VOLT * 10) * 100 / P23_VOLT
+                 : clampi(x, 0, 127) * 1000 / 127,
+                 k < fx_n() && (fx_kind(k) == 2u || fx_kind(k) == 4u), (int32_t)j == t,
+                 fx_lfo() || fx_arp() ? TRACK_COL[ui.sel] : row_tint ? row_tint : C_SEND);
+        row_tint = 0;
+        ui.shown_rows[j] = x;
+    }
+    ui.shown_touch = (int8_t)t;
+    ui.shown_half = ui.half;
+    ui.shown_sub = (uint8_t)sub;
+}
+
+/* the step held, on the step view's TRIG knobs: NOTE, VEL, LEN, COND as an EDIT page's rows */
+static void cond_text(char *b, uint32_t c)
+{
+    static const char *const CN[CD_PROB] = {"NONE", "PRE", "!PRE", "NEI", "!NEI", "1ST", "!1ST"};
+    uint32_t a, n;
+    if (c < CD_PROB)
+        str_cpy(b, CN[c], 8);
+    else if (c < CD_AB) {
+        fmt_int(b, PROB[c - CD_PROB]);
+        str_cpy(b + str_len(b), "%", 2);
+    } else {
+        cond_ab(c, &a, &n);
+        str_cpy(b, (c - CD_AB) & 1u ? "!" : "", 2);
+        fmt_int(b + str_len(b), (int32_t)a);
+        str_cpy(b + str_len(b), ":", 2);
+        fmt_int(b + str_len(b), (int32_t)n);
+    }
+}
+static void draw_step_page(void)
+{
+    static const char *const NAME[4] = {"NOTE", "VEL", "LEN", "COND"};
+    uint32_t t = ui.sl, i = (uint32_t)white_ix(ui.step_key), j;
+    int32_t tc = (int32_t)(ui.touch_until - fm1_ms) > 0 ? ui.touched : -1;
+    int full = ui.force || ui.shown_page != SHOWN_STEP || ui.shown_sub != (ui.mod ? i + 48u : i + 16u * ui.half);
+    if (full) {
+        char t1[12] = "STEP ";
+        fmt_int(t1 + 5, (int32_t)i + 1);
+        draw_rows_title(t1, ui.mod ? "MOD" : "TRIG", TRACK_COL[ui.sel]);   /* (its half under the title: A .. D, E .. H) */
+    }
+    if (ui.mod) {                                /* MOD: MUTATE, MUT EVERY, MIDI FX, FX EVERY */
+        static const char *const MN[4] = {"MUTATE", "MUT EVERY", "MIDI FX", "FX EVERY"};
+        int32_t n = SCALE_N[ui.scale];
+        for (j = 0; j < 4u; j++) {
+            int32_t v = j == 0u ? seq_mut[t][i] : j == 1u ? seq_mcy[t][i] : j == 2u ? seq_mfx[t][i] : seq_fcy[t][i];
+            int32_t fr, bip = 0;
+            char b[12];
+            if (!full && ui.shown_rows[j] == v && ((int32_t)j == tc) == ((int32_t)j == ui.shown_touch))
+                continue;
+            if (j == 0u) {
+                if (v == MUT_RND)
+                    str_cpy(b, "RND", 4);
+                else if (!v)
+                    str_cpy(b, "OFF", 4);
+                else {
+                    str_cpy(b, v > 0 ? "+" : "", 2);
+                    fmt_int(b + str_len(b), v);
+                }
+                fr = v == MUT_RND ? 1000 : (clampi(v, -n, n) + n) * 1000 / (2 * n + 1);
+                bip = v != MUT_RND;
+            } else if (j == 2u) {
+                str_cpy(b, MFX_NAME[v % NMFX], sizeof b);
+                fr = v * 1000 / (NMFX - 1);
+            } else {
+                fmt_int(b, v + 1);
+                fr = v * 1000 / 15;
+            }
+            draw_row(j, MN[j], b, fr, bip, (int32_t)j == tc, TRACK_COL[ui.sel]);
+            ui.shown_rows[j] = v;
+        }
+        ui.shown_touch = (int8_t)tc;
+        ui.shown_sub = (uint8_t)(i + 48u);
+        return;
+    }
+    if (ui.half) {                               /* E .. H: the ratchet */
+        for (j = 0; j < 4u; j++) {
+            int32_t v = j == 0u ? seq_rtg[t][i] : 0;
+            if (!full && ui.shown_rows[j] == v && ((int32_t)j == tc) == ((int32_t)j == ui.shown_touch))
+                continue;
+            if (j == 0u)
+                draw_row(j, "RATCHET", RTG_NAME[v % NRTG], v * 1000 / (NRTG - 1), 0, (int32_t)j == tc, TRACK_COL[ui.sel]);
+            else
+                draw_row(j, "", "", 0, 0, 0, TRACK_COL[ui.sel]);
+            ui.shown_rows[j] = v;
+        }
+        ui.shown_touch = (int8_t)tc;
+        ui.shown_sub = (uint8_t)(i + 16u);
+        return;
+    }
+    for (j = 0; j < 4u; j++) {
+        int32_t v, fr, key;
+        char b[16];
+        v = j == 0u ? seq_note[t][i] : j == 1u ? seq_vel[t][i] : j == 2u ? seq_glen[t][i] : seq_cond[t][i];
+        fr = j == 0u ? (v - 12) * 1000 / 108 : j == 1u ? v * 1000 / 127 : j == 2u ? v * 1000 / (NGLEN - 1)
+             : v * 1000 / (NCOND - 1);
+        key = v;
+        if (!full && ui.shown_rows[j] == key && ((int32_t)j == tc) == ((int32_t)j == ui.shown_touch))
+            continue;
+        if (j == 0u)
+            note_text(b, (uint32_t)v);
+        else if (j == 1u)
+            fmt_int(b, pct_disp(v) ? pct_disp(v) : 1);
+        else if (j == 2u)
+            str_cpy(b, GLEN_NAME[v], sizeof b);
+        else
+            cond_text(b, (uint32_t)v);
+        draw_row(j, NAME[j], b, fr, 0, (int32_t)j == tc, TRACK_COL[ui.sel]);
+        ui.shown_rows[j] = key;
+    }
+    ui.shown_touch = (int8_t)tc;
+    ui.shown_sub = (uint8_t)i;
+}
+
+/* the TEMPO page (PLAY held): the session's tempo, as large as the screen takes it */
+static void draw_tempo_page(void)
+{
+    char n[8];
+    int ext = midi_slave();                      /* (following a clock: its tempo, EXT; build 46) */
+    int32_t v = ext ? (fx_bpm10 + 5) / 10 : ui.tempo;
+    if (!ui.force && ui.shown_page == PG_TEMPO && ui.shown_rows[0] == v + ext * 1000)
+        return;
+    fmt_int(n, v);
+    CV_AREA(0, 0, 240, 60, C_BLACK)
+        cv_text_c(14, &FONT_M, ext ? "EXT TEMPO" : "TEMPO", C_WHITE);
+    CV_AREA(0, 60, 240, 150, C_BLACK)
+        cv_text_c(0, &FONT_XL, n, RGB(255, 210, 120));
+    CV_AREA(0, 210, 240, 30, C_BLACK)
+        cv_text_c(2, &FONT_S, "BPM", C_GREY);
+    ui.shown_rows[0] = v + ext * 1000;
+}
+
+#define C_SCALE RGB(255, 196, 90)
+/* the SCALE page (ARP; Tonitor's): the root, as large as the screen takes it, the scale under it; the one turned
+ * last, for 1.5 s, white behind it */
+static void draw_scale_page(void)
+{
+    int32_t tc = (int32_t)(ui.touch_until - fm1_ms) > 0 ? ui.touched : -1, key = ui.root * 100 + ui.scale * 3 + tc + 1;
+    uint16_t bg, fg;
+    if (!ui.force && ui.shown_page == PG_SCALE && ui.shown_rows[0] == key)
+        return;
+    CV_AREA(0, 0, 240, 50, C_BLACK)
+        cv_text_c(6, &FONT_M, "SCALE", C_SCALE);
+    bg = tc == 0 ? C_WHITE : C_BLACK;
+    fg = tc == 0 ? C_BLACK : C_WHITE;
+    CV_AREA(0, 50, 240, 100, bg)
+        cv_text_c(4, &FONT_XL, NOTE_NAME[ui.root], fg);
+    bg = tc == 1 ? C_WHITE : C_BLACK;
+    fg = tc == 1 ? C_BLACK : C_SCALE;
+    CV_AREA(0, 150, 240, 90, bg) {
+        if (SCALE_L2[ui.scale][0]) {
+            cv_text_fit(4, &FONT_M, SCALE_L1[ui.scale], fg);
+            cv_text_fit(46, &FONT_M, SCALE_L2[ui.scale], fg);
+        } else
+            cv_text_fit(26, &FONT_M, SCALE_L1[ui.scale], fg);
+    }
+    ui.shown_rows[0] = key;
+}
+
+/* the PHRASE page (the phrase key held): the track's DENSITY and COMPLEXITY, as rows */
+static void draw_gen_page(void)
+{
+    uint32_t t = ui.sl, j;                       /* (the lane: the chosen subtrack's) */
+    int32_t tc = (int32_t)(ui.touch_until - fm1_ms) > 0 ? ui.touched : -1;
+    int full = ui.force || ui.shown_page != PG_GEN || ui.shown_sub != t;
+    if (full) {
+        char t1[12] = "PHRASE ";
+        uint8_t h = ui.half;
+        fmt_int(t1 + 7, (int32_t)ui.sel + 1);
+        if (trk_lanes(ui.sel)) {                 /* (a DRUM track: its subtrack, 1B) */
+            t1[8] = (char)('A' + ui.sub[ui.sel] % NSUB);
+            t1[9] = 0;
+        }
+        ui.half = 0;
+        draw_rows_title(t1, "", TRACK_COL[ui.sel]);
+        ui.half = h;
+    }
+    for (j = 0; j < 4u; j++) {
+        int32_t v = j == 0u ? ui.gen_den[t] : j == 1u ? ui.gen_cx[t] : 0;
+        char b[8];
+        if (!full && ui.shown_rows[j] == v && ((int32_t)j == tc) == ((int32_t)j == ui.shown_touch))
+            continue;
+        fmt_int(b, v);
+        if (j < 2u)
+            draw_row(j, j ? "COMPLEXITY" : "DENSITY", b, v * 10, 0, (int32_t)j == tc, TRACK_COL[ui.sel]);
+        else
+            draw_row(j, "", "", 0, 0, 0, TRACK_COL[ui.sel]);
+        ui.shown_rows[j] = v;
+    }
+    ui.shown_touch = (int8_t)tc;
+    ui.shown_sub = (uint8_t)t;
+}
+
+/* the TRACK page (the step view's 2nd black key): the track's LENGTH and CLOCK, as rows */
+static void draw_trk_page(void)
+{
+    uint32_t t = ui.sl, j;                       /* (the lane: the chosen subtrack's) */
+    int32_t tc = (int32_t)(ui.touch_until - fm1_ms) > 0 ? ui.touched : -1;
+    int full = ui.force || ui.shown_page != PG_TRK || ui.shown_sub != t;
+    if (full) {
+        char t1[12] = "TRACK ";
+        uint8_t h = ui.half;
+        fmt_int(t1 + 6, (int32_t)ui.sel + 1);
+        if (trk_lanes(ui.sel)) {                 /* (a DRUM track: its subtrack, 1B) */
+            t1[7] = (char)('A' + ui.sub[ui.sel] % NSUB);
+            t1[8] = 0;
+        }
+        ui.half = 0;
+        draw_rows_title(t1, "", TRACK_COL[ui.sel]);
+        ui.half = h;
+    }
+    for (j = 0; j < 4u; j++) {
+        int32_t v = j == 0u ? (seq_len[t] ? seq_len[t] : (int32_t)NSTEP) : j == 1u ? seq_div[t] : 0;
+        char b[8];
+        if (!full && ui.shown_rows[j] == v && ((int32_t)j == tc) == ((int32_t)j == ui.shown_touch))
+            continue;
+        if (j == 0u) {
+            fmt_int(b, v);
+            draw_row(j, "LENGTH", b, (v - 1) * 1000 / 15, 0, (int32_t)j == tc, TRACK_COL[ui.sel]);
+        } else if (j == 1u)                      /* (bipolar: 1X in the middle) */
+            draw_row(j, "CLOCK", DIV_NAME[v % NDIV], v <= (int32_t)SEQ_DIV1 ? v * 500 / (int32_t)SEQ_DIV1
+                     : 500 + (v - (int32_t)SEQ_DIV1) * 500 / (int32_t)(NDIV - 1u - SEQ_DIV1), 1, (int32_t)j == tc, TRACK_COL[ui.sel]);
+        else
+            draw_row(j, "", "", 0, 0, 0, TRACK_COL[ui.sel]);
+        ui.shown_rows[j] = v;
+    }
+    ui.shown_touch = (int8_t)tc;
+    ui.shown_sub = (uint8_t)t;
+}
+
+/* a knob's parameter as a dial over the whole screen: its name and the track; a dial from 7 o'clock to 5 (bipolar
+ * ones from 12 o'clock either way); its value under it */
+#define DIAL_CX 120
+#define DIAL_CY 124
+#define DIAL_R 76
+static void dial_dot(int32_t oy, int32_t x, int32_t y, int32_t r, uint16_t c) { cv_rect(x - r, y - r - oy, 2 * r + 1, 2 * r + 1, c); }
+static void dial_at(uint32_t a, int32_t r, int32_t *x, int32_t *y)
+{
+    *x = DIAL_CX + mulq15(r, sin_ph(a));
+    *y = DIAL_CY - mulq15(r, sin_ph(a + 0x40000000u));
+}
+static int32_t dial_key(void)                    /* (what the dial shows, folded into one number) */
+{
+    if (ui.dial_lk)
+        return pl_val(ui.sl, ui.dial_step, ui.dial_lk - 1u) + ui.dial_lk * 1024 + ui.dial_step * 131072 + (1 << 24);
+    return par_val(cur(), ui.dial_pg, ui.dial_j) + ui.dial_pg * 1024 + ui.dial_j * 8192;
+}
+static void draw_dial(void)
+{
+    static const int32_t BAND[3][2] = {{0, 112}, {112, 112}, {224, 16}};
+    const sound_t *s = cur();
+    par_t p;
+    int32_t v, b, k, from, to, fr;
+    uint32_t av;
+    char t[16], m[16];
+    uint16_t col = TRACK_COL[ui.sel];
+    const font_t *tf;
+    if (ui.dial_lk) {                                /* a step's lock: REVERB S5 */
+        uint32_t id = ui.dial_lk - 1u;
+        pl_par(s, id, &p);
+        v = pl_val(ui.sl, ui.dial_step, id);
+        str_cpy(t, p.name, sizeof t - 4);
+        str_cpy(t + str_len(t), " S", 3);
+        fmt_int(t + str_len(t), ui.dial_step + 1);
+    } else {
+        par_get(s, ui.dial_pg, ui.dial_j, &p);
+        v = par_val(s, ui.dial_pg, ui.dial_j);
+        str_cpy(t, p.name, sizeof t - 2);
+        str_cpy(t + str_len(t), " ", 2);
+        t[str_len(t) + 1] = 0;
+        t[str_len(t)] = (char)('1' + ui.sel);
+    }
+    tf = text_w(&FONT_M, t) <= 232 ? &FONT_M : text_w(&FONT_S, t) <= 232 ? &FONT_S : &FONT_XS;   /* (the size that
+                                                  * fits: REVERB SEND 6 only in the smallest; build 59) */
+    par_text(&p, v, m);
+    fr = p.hi > p.lo ? (v - p.lo) * 1000 / (p.hi - p.lo) : 0;   /* 0 .. 1000 */
+    if (p.kind == PK_BIP) {
+        from = 0;
+        to = (fr - 500) * 45 / 500;
+        av = (uint32_t)((fr - 500) * (int32_t)(0x60000000u / 500u));
+    } else {
+        from = -45;
+        to = -45 + fr * 90 / 1000;
+        av = 0xA0000000u + (0xC0000000u / 1000u) * (uint32_t)fr;
+    }
+    if (to < from) {
+        int32_t x_ = to;
+        to = from;
+        from = x_;
+    }
+    for (b = 0; b < 3; b++) {
+        int32_t oy = BAND[b][0], x, y;
+        CV_AREA(0, (uint32_t)oy, 240, (uint32_t)BAND[b][1], C_BLACK) {
+            cv_text(((int32_t)cv_w - text_w(tf, t)) / 2, 2 + ((int32_t)FONT_M.h - (int32_t)tf->h) / 2 - oy, tf, t, col);
+            for (k = -45; k <= 45; k++) {
+                dial_at((uint32_t)(k * 35791394), DIAL_R, &x, &y);
+                dial_dot(oy, x, y, 4, C_GREY);
+            }
+            for (k = from; k <= to; k++) {
+                dial_at((uint32_t)(k * 35791394), DIAL_R, &x, &y);
+                dial_dot(oy, x, y, 7, col);
+            }
+            for (k = 0; k <= DIAL_R - 16; k += 4) {
+                dial_at(av, k, &x, &y);
+                dial_dot(oy, x, y, 4, C_WHITE);
+            }
+            dial_dot(oy, DIAL_CX, DIAL_CY, 10, C_WHITE);
+            if (b >= 1)
+                cv_text_fit(200 - oy, &FONT_M, m, C_WHITE);
+        }
+    }
+    ui.shown_dial = dial_key();
+    ui.dial_drawn_at = fm1_ms;
+}
+
+static int draw_flash(void)
+{
+    uint32_t t = fm1_ms - ui.flash_t0, ph = t / 250u, on;
+    uint16_t bg, fg;
+    if (!ui.flash_on)
+        return 0;
+    if (t >= 1500u) {
+        ui.flash_on = 0;
+        ui.force = 1;
+        return 0;
+    }
+    if (ph == ui.flash_phase)
+        return 1;
+    ui.flash_phase = (uint8_t)ph;
+    on = !(ph & 1u);
+    bg = on ? ui.flash_col : C_BLACK;
+    fg = on ? C_BLACK : ui.flash_col;
+    CV_AREA(0, 0, 240, 100, bg)
+        cv_text_c(ui.flash_l2[0] ? 40 : 52, &FONT_L, ui.flash_l1, fg);
+    CV_AREA(0, 100, 240, 140, bg)
+    {
+        const font_t *f2 = text_w(&FONT_L, ui.flash_l2) <= 232 ? &FONT_L : text_w(&FONT_M, ui.flash_l2) <= 232
+                           ? &FONT_M : &FONT_S;  /* (SESSION 16: the size that fits, not squeezed) */
+        cv_text_fit(10 + ((int32_t)FONT_L.h - (int32_t)f2->h) / 2, f2, ui.flash_l2, fg);
+    }
+    return 1;
+}
+
+static void ui_draw(void)
+{
+    int msg;
+    const char *c;
+    sel_sync();
+    msg = (int32_t)(ui.msg_until - fm1_ms) > 0;
+    c = msg ? ui.msg : family_name(cur());
+    char cp[12] = "COPY S";
+    if (ui.sclip.on && step_view() && !msg) {        /* (a step copied: shown, blinking, until it is pasted) */
+        fmt_int(cp + 6, ui.sclip.i + 1);
+        c = cp;
+        msg = (int)((fm1_ms / 400u) & 1u);
+    }
+    if (ui.mute_mode && !msg) {                      /* (MUTE mode: said in the band while it is on) */
+        c = "MUTE MODE";
+        msg = 1;
+    }
+    if (ui.learn && !msg) {                          /* (MIDI LEARN too) */
+        c = "MIDI LEARN";
+        msg = 1;
+    }
+    int32_t px;
+    if (draw_flash())
+        return;
+    if ((int32_t)(ui.dial_until - fm1_ms) > 0 && (ui.page == PG_MAIN || ui.dial_lk)) {   /* (a step's lock: on any
+                                                                                      * page, the step's own too) */
+        int32_t key = dial_key();
+        if (ui.shown_page != SHOWN_DIAL || (ui.shown_dial != key && (uint32_t)(fm1_ms - ui.dial_drawn_at) >= 40u))
+            draw_dial();
+        ui.shown_page = SHOWN_DIAL;
+        return;
+    }
+    if ((int32_t)(ui.sc_peek_until - fm1_ms) > 0) {  /* (SHIFT + ARP: the scale drawn, shown a moment) */
+        draw_scale_page();
+        ui.shown_page = PG_SCALE;
+        ui.force = 0;
+        return;
+    }
+    if (step_page()) {                               /* a step held, the step view's knobs on it */
+        draw_step_page();
+        ui.shown_page = SHOWN_STEP;
+        ui.force = 0;
+        return;
+    }
+    if (ui.page == PG_EDIT) {
+        draw_edit_page();
+        ui.shown_page = PG_EDIT;
+        ui.force = 0;
+        return;
+    }
+    if (ui.page == PG_FXP) {
+        draw_fx_page();
+        ui.shown_page = PG_FXP;
+        ui.force = 0;
+        return;
+    }
+    if (ui.page == PG_TEMPO) {
+        draw_tempo_page();
+        ui.shown_page = PG_TEMPO;
+        ui.force = 0;
+        return;
+    }
+    if (ui.page == PG_SCALE) {
+        draw_scale_page();
+        ui.shown_page = PG_SCALE;
+        ui.force = 0;
+        return;
+    }
+    if (ui.page == PG_GEN) {
+        draw_gen_page();
+        ui.shown_page = PG_GEN;
+        ui.force = 0;
+        return;
+    }
+    if (ui.page == PG_TRK) {
+        draw_trk_page();
+        ui.shown_page = PG_TRK;
+        ui.force = 0;
+        return;
+    }
+    if (pg_any()) {
+        if (ui.page == PG_SET)
+            setup_draw();
+        else
+            prj_draw();
+        ui.shown_page = ui.page;
+        ui.force = 0;
+        return;
+    }
+    if (ui.shown_page != PG_MAIN) {
+        ui.shown_page = PG_MAIN;
+        ui.force = 1;
+        lcd_fill(0, 0, 240, 240, C_BLACK);           /* (the gaps between the bands, from the page before) */
+    }
+    {
+        int32_t pk = pat_cur * 32 + pat_dirty * 16 + ui.rec * 4 + ui.lrec +
+                     (seq_pend == 1u ? 1024 + (int32_t)((fm1_ms / 300u) & 1u) * 2048 : 0) +
+                     (ui.oct[ui.sl] + 3) * 4096 +
+                     (ui.chord_on[ui.sel] && ui.eng[ui.sel] != ENG_BD ? (ui.chord_form[ui.sel] + 1) * 32768 : 0) +
+                     trk_mute[ui.sel] * (1 << 20) + (ui.trn[ui.sl] + 64) * (1 << 21) + arp_on[ui.sel] * (1 << 28);   /* (the
+                                                      * octave and the chord shown: drawn again as they change) */
+        if (ui.force || ui.shown_sel != (int32_t)(ui.sel + 16u * ui.sl) || ui.shown_prj != pk || ui.shown_batt != batt_key()) {
+            ui.shown_prj = pk;
+            ui.shown_batt = batt_key();
+            draw_number();
+            ui.shown_sel = (int32_t)(ui.sel + 16u * ui.sl);   /* (the track and its subtrack) */
+            ui.shown_eng = ui.shown_msg = ui.shown_pan = ui.shown_level = ui.shown_mac = -100;
+        }
+    }
+    if (ui.shown_eng != (int32_t)prof_of(cur()) + 32 * (int32_t)trk_mute[ui.sel]) {   /* (the profile, not only the circuit) */
+        draw_engine();
+        ui.shown_eng = (int32_t)prof_of(cur()) + 32 * (int32_t)trk_mute[ui.sel];
+        ui.shown_msg = -1;
+        ui.shown_mac = -1;
+    }
+    if (ui.shown_mac != mac_key())
+        draw_macros();
+    if (ui.shown_msg != msg || !str_eq(c, ui.shown_text)) {
+        draw_sound(c, msg);
+        str_cpy(ui.shown_text, c, sizeof ui.shown_text);
+        ui.shown_msg = msg;
+    }
+    px = meter_px(trk[ui.sl].meter);
+    if (ui.shown_level != ui.level[ui.sl] || ((uint32_t)(fm1_ms - ui.meter_at) >= 30u && px != ui.shown_meter)) {
+        draw_meter(px);
+        ui.meter_at = fm1_ms;
+    }
+    if (ui.shown_pan != ui.pan[ui.sl])
+        draw_pan();
+    ui.force = 0;
+}
+
+/* the start: on each track a sound of each machine; tracks 1 .. 3 on DRUM (a kick, a snare, a hat), 4 4-OP,
+ * 5 WAVY, 6 HIVE */
+static const uint8_t ENG0[NTRACK] = {ENG_BD, ENG_BASS, ENG_SD, ENG_HHT, ENG_BD, ENG_HHT};   /* (the start's:
+                                                  * three DRUMs, 4-OP, WAVY, HIVE; projects.c's new session too) */
+static const char *const FAM0[NTRACK] = {"HAMMER", "GRIND", "HARSH", "SHARD HAT", "WAR TOM", "STATIC"};
+static void ui_init(void)
+{
+    uint32_t t, e;
+    memset(&ui, 0, sizeof ui);
+    memset(ui.midi_track, 0, sizeof ui.midi_track);
+    midi_cc_init();
+    memset(ui.key_track, 0xFF, sizeof ui.key_track);
+    ui.step_key = ui.qk = ui.sk = KEY_NONE;
+    memset(ui.rec_step, 0xFF, sizeof ui.rec_step);
+    memset(ui.lk_ev, 0xFF, sizeof ui.lk_ev);
+    ui.lv_k = KEY_NONE;
+    memset(ui.gen_den, 50, sizeof ui.gen_den);
+    memset(ui.gen_cx, 50, sizeof ui.gen_cx);
+    ui.click = 1;
+    ui.seed = fm1_ticks() ^ 0x5EEDu;
+    scale_draw();                                    /* (a scale and root at random, as Tonitor's start; build 77) */
+    ui.tempo = 120;
+    for (t = 0; t < NTRACK; t++) {
+        ui.eng[t] = ENG0[t];
+        for (e = 0; e < NENG; e++)
+            if (e == ENG0[t]) gen_sound(&ui.snd[t][e], e, fam_find(FAM0[t]), -1, next_seed());
+            else snd_later(&ui.snd[t][e], e, next_seed());
+        ui.level[t] = LEVEL_UNITY;
+        ui.pan[t] = PAN_DEF[t];
+        level_pan_apply(t);
+        ck_cook(&ck_buf[t][0], &ui.snd[t][ui.eng[t]]);
+        ck_buf[t][1] = ck_buf[t][0];
+        ck_pub[t] = ck_use[t] = 0;
+    }
+    for (t = NTRACK; t < NLANE; t++) {           /* (the shared lanes: free, a drum sound each, at unity) */
+        gen_sound(&ui_lsnd[t - NTRACK], ENG_BD, -1, -1, next_seed());
+        ui.level[t] = LEVEL_UNITY;
+        level_pan_apply(t);
+        ck_cook(&ck_buf[t][0], &ui_lsnd[t - NTRACK]);
+        ck_buf[t][1] = ck_buf[t][0];
+        ck_pub[t] = ck_use[t] = 0;
+    }
+    ui.oct[0] = -1;
+    ui.solo = 0xFF;
+    ui.touched = -1;
+    ui.shown_sel = ui.shown_eng = ui.shown_msg = -1;
+    ui.force = 1;
+}
