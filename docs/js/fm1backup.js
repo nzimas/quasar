@@ -10,8 +10,8 @@
 import { pack7, unpack7 } from "./fm1ota.js";
 
 export const LOOP = 0x1000, SETUP = 0x2000, CHUNK = 256;
-export const STATUS = ["done", "the FM-1 has no flash store", "the request was not understood",
-  "there is no room left on the FM-1", "the record was not whole (damaged file?)", "writing the flash failed"];
+export const STATUS = ["done", "FM-1 has no flash store", "request was not understood",
+  "no room left on FM-1", "record was not whole (damaged file?)", "writing flash failed"];
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 /** what a record is: {kind: "session" | "patterns" | "loops" | "setup", session: 1 .. 16} */
@@ -37,7 +37,7 @@ export function frame(cmd, body = []) {
 export async function ask(link, cmd, body = [], ms = 3000) {
   for (let tries = 0; tries < 3; tries++) {
     link.drain();
-    if (!link.send(frame(cmd, body))) throw new Error("The FM-1 is no longer reachable.");
+    if (!link.send(frame(cmd, body))) throw new Error("FM-1 is no longer reachable.");
     const end = now() + ms;
     let left;
     while ((left = end - now()) > 0) {
@@ -70,7 +70,7 @@ export async function readRecord(link, rec, done = () => {}) {
   const out = new Uint8Array(rec.length);
   for (let off = 0; off < rec.length;) {
     const b = await ask(link, 0x51, [rec.number & 0xFF, rec.number >> 8, ...w32(off), CHUNK & 0xFF, CHUNK >> 8]);
-    if (!b) throw new Error(`The FM-1 stopped answering while reading record ${rec.number}.`);
+    if (!b) throw new Error(`FM-1 stopped answering while reading record ${rec.number}.`);
     const n = b[6] | (b[7] << 8);
     if (!n || le32(b, 2) !== off) throw new Error(`Record ${rec.number} could not be read whole.`);
     out.set(b.slice(8, 8 + n), off);
@@ -85,7 +85,7 @@ const named = (number) => {
 };
 export async function writeRecord(link, number, bytes, done = () => {}) {
   const check = (b, what) => {
-    if (!b) throw new Error(`The FM-1 stopped answering (${what}).`);
+    if (!b) throw new Error(`FM-1 stopped answering (${what}).`);
     if (b[0]) throw new Error(`${named(number)}: ${STATUS[b[0]] || "error " + b[0]}.`);
   };
   check(await ask(link, 0x52, [number & 0xFF, number >> 8, ...w32(bytes.length)], 5000), "starting");

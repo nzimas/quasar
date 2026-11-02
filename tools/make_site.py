@@ -168,7 +168,7 @@ def page(title, current, body, desc, head=""):
       <button class="menu-btn" type="button" aria-label="Menu" aria-controls="site-nav" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
     <nav id="site-nav" aria-label="Site">
-      <button class="menu-close" type="button" aria-label="Close the menu">&times;</button>
+      <button class="menu-close" type="button" aria-label="Close menu">&times;</button>
       {links}
     </nav>
     <div class="menu-shade" hidden></div>
@@ -188,7 +188,7 @@ def page(title, current, body, desc, head=""):
     <footer>
       <p>Developed by Nuno Zimas. Firmware: GPL-3.0. Website and logo: MIT. <a href="{REPO}">Source on GitHub</a>.</p>
       <p>M-VAVE and FM-1 are trademarks of their owner; SOMA Laboratory and Pulsar-23 are trademarks of SOMA Laboratory;
-        Elektron is a trademark of Elektron Music Machines. They are used only to say which device Quasar runs on and
+        Elektron is trademark of Elektron Music Machines. They are used only to say which device Quasar runs on and
         which instrument it takes as its model. Quasar is not made, endorsed or supported by any of them.</p>
       <form class="donate donate-foot" action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
         <input type="hidden" name="cmd" value="_xclick">
@@ -210,27 +210,27 @@ def page(title, current, body, desc, head=""):
 def fragments():
     src = ROOT / "site"
     (DOCS / "index.html").write_text(page(
-        "Quasar — a firmware for the M-VAVE FM-1", "Home", (src / "home.html").read_text().replace("{LOGO_V}", LOGO_V),
-        "Quasar: a firmware for the M-VAVE FM-1 for experimental IDM, after the SOMA Pulsar-23, with an audio engine "
+        "Quasar — firmware for M-VAVE FM-1", "Home", (src / "home.html").read_text().replace("{LOGO_V}", LOGO_V),
+        "Quasar: firmware for M-VAVE FM-1 for experimental IDM, after SOMA Pulsar-23, with audio engine "
         "written from scratch."))
     (DOCS / "screens.html").write_text(page(
         "Quasar on the FM-1's screen", "Screens", (src / "screens.html").read_text(),
-        "Quasar on the M-VAVE FM-1's screen: the track view, the sound's pages, TRANSFORM, PERFORMANCE and the sessions."))
+        "Quasar on the M-VAVE FM-1's screen: track view, sound pages, TRANSFORM, PERFORMANCE and sessions."))
     (DOCS / "install.html").write_text(page(
         "Install Quasar", "Install", (src / "install.html").read_text(),
-        "Install Quasar on an M-VAVE FM-1 from your browser, over USB MIDI.",
+        "Install Quasar on M-VAVE FM-1 from your browser, over USB MIDI.",
         '\n<script type="module" src="js/install.js"></script>'))
     (DOCS / "backup.html").write_text(page(
         "Back up Quasar sessions", "Backup", (src / "backup.html").read_text(),
-        "Save the sessions on an M-VAVE FM-1 running Quasar to a file, and restore them, from your browser.",
+        "Save sessions on M-VAVE FM-1 running Quasar to file, and restore them, from your browser.",
         '\n<script type="module" src="js/backup.js"></script>'))
     (DOCS / "projects.html").write_text(page(
         "Other projects by Nuno Zimas", "Other projects", (src / "projects.html").read_text(),
-        "Firmware and instruments by Nuno Zimas for the M-VAVE FM-1, the Elektron Model:Cycles and Digitone II, the "
-        "Ableton Move, the Akai MPC One and macOS."))
+        "Firmware and instruments by Nuno Zimas for M-VAVE FM-1, Elektron Model:Cycles and Digitone II, "
+        "Ableton Move, Akai MPC One and macOS."))
     (DOCS / "apps.html").write_text(page(
         "Apps by Nuno Zimas", "Apps", (src / "apps.html").read_text(),
-        "Music apps by Nuno Zimas for phones and tablets: Vascular, a touch instrument for iOS and Android."))
+        "Music apps by Nuno Zimas for phones and tablets: Vascular, touch instrument for iOS and Android."))
 
 
 # The FM-1's face, in the units of Felucca's browser emulator (hugelton/Felucca, web/emu/index.html, its "wide"
@@ -245,16 +245,16 @@ FM1_COLOURS = {"body": "#1d1d1f", "tray": "#141415", "part": "#2a2a2d", "edge": 
 
 # the table under the drawings: (numbers, control, what it does under Quasar); a row of several numbers spans them
 CONTROLS = [
-    ([1], "MASTER", "Output level (not the USB audio's)."),
-    ([2], "SELECT", "Chosen track's level. On the SCALE page: root. A step held: its VOL, locked."),
+    ([1], "MASTER", "Output level (not USB audio's)."),
+    ([2], "SELECT", "Chosen track's level. On SCALE page: root. Step held: its VOL, locked."),
     ([3], "PRESETS", 'Chosen track\'s <a href="#engine-profiles">engine profile</a> (BD, HAMMER, SKIN, SD, WALL, WIRE, '
-                     "TONE, HHT, STATIC, METAL, SHAKE, GRIND, BASS, FM, PRC, PLUCK). <b>SHIFT +</b>: new sound of the "
-                     "family before or after. On a page: its rows, slots or entries; on the EDIT and SEQ pages, turned "
-                     "right, rows E to H. On the TEMPO page: tempo."),
-    ([4], "ALGORITHM", "Chosen track's pan. On the SCALE page: scale. A step held: its pan, locked."),
-    ([5], "OCT−", "Chosen track's octave down. In the step view: its "
+                     "TONE, HHT, STATIC, METAL, SHAKE, GRIND, BASS, FM, PRC, PLUCK). <b>SHIFT +</b>: new sound of "
+                     "family before or after. On a page: its rows, slots or entries; on EDIT and SEQ pages, turned "
+                     "right, rows E to H. On TEMPO page: tempo."),
+    ([4], "ALGORITHM", "Chosen track's pan. On SCALE page: scale. Step held: its pan, locked."),
+    ([5], "OCT−", "Chosen track's octave down. In step view: its "
                   '<a href="#transposition">transposition</a>. <b>SHIFT +</b>: every track\'s transposition. '
-                  "On the EDIT and SEQ pages: the page before."),
+                  "On EDIT and SEQ pages: page before."),
     ([6], "OCT+", "Same, up."),
     ([7], "screen", 'See <a href="#screen">Screen</a>.'),
     ([8], "KNOB 1", 'Chosen track\'s <a href="#macros">macro</a> 1 (PUNCH, TONE or CUTOFF). <b>SHIFT +</b>: its DRIVE. '
@@ -262,43 +262,43 @@ CONTROLS = [
     ([9], "KNOB 2", "Macro 2 (SHAPE, SNAP, GRIT or TIMBRE). <b>SHIFT +</b>: its FX send. On a page: row B."),
     ([10], "KNOB 3", "Macro 3 (CHAOS or MOTION). <b>SHIFT +</b>: its ATTACK. On a page: row C."),
     ([11], "KNOB 4", "Macro 4 (DECAY). <b>SHIFT +</b>: macro 8 (BEND, RING or RESO). On a page: row D. "
-                     'During <a href="#performance">PERFORMANCE</a>, KNOB 1–4 turn the macro on every track with notes.'),
+                     'During <a href="#performance">PERFORMANCE</a>, KNOB 1–4 turn macro on every track with notes.'),
     ([12, 13, 14, 15, 16, 17], ["FX (T1)", "SEL (T2)", "ENV (T3)", "LFO (T4)", "EDIT (T5)", "GLO (T6)"],
-     "<b>T1</b> to <b>T6</b>: choose track 1 to 6. From any page, back to the track; on the SEQ pages, "
-     "<b>SHIFT +</b> keeps the page. In "
+     "<b>T1</b> to <b>T6</b>: choose track 1 to 6. From any page, back to track; on SEQ pages, "
+     "<b>SHIFT +</b> keeps page. In "
      '<a href="#mute-mode">MUTE mode</a>: mute; <b>held</b> (1 s), solo.'),
-    ([18], "HOME", '<a href="#sounds">New sound</a> for the chosen track, from another family of its profile. '
-                   "<b>SHIFT +</b>: of the same family. <b>Held</b> (0.8 s): save the session."),
-    ([19], "SAVE", '<a href="#patterns">PATTERNS</a> grid. <b>Held</b> (0.8 s): save the session (on the grid: the '
-                   'pattern playing, into the slot under the cursor). <b>SHIFT +</b>: <a href="#sessions">SESSIONS</a> '
+    ([18], "HOME", '<a href="#sounds">New sound</a> for chosen track, from another family of its profile. '
+                   "<b>SHIFT +</b>: of same family. <b>Held</b> (0.8 s): save session."),
+    ([19], "SAVE", '<a href="#patterns">PATTERNS</a> grid. <b>Held</b> (0.8 s): save session (on grid: '
+                   'pattern playing, into slot under cursor). <b>SHIFT +</b>: <a href="#sessions">SESSIONS</a> '
                    'grid; <b>held</b>: <a href="#global-setup">GLOBAL SETUP</a>.'),
     ([20], "ARP", '<a href="#scales">SCALE</a> page. <b>SHIFT +</b>: scale and root at random.'),
-    ([21], "SEQ", '<a href="#effects-seq">Panel pages</a> (SHAOS, LFO, FX, MIX), then the chosen track\'s DUCK and '
+    ([21], "SEQ", '<a href="#effects-seq">Panel pages</a> (SHAOS, LFO, FX, MIX), then chosen track\'s DUCK and '
                   '<a href="#automation-lfos">AUTO 1–3</a>. <b>SHIFT +</b>: its LFOs drawn anew.'),
-    ([22], "PLAY", 'Start or stop the <a href="#sequencer">sequencer</a>. <b>Held</b> (0.8 s): TEMPO page. '
+    ([22], "PLAY", 'Start or stop <a href="#sequencer">sequencer</a>. <b>Held</b> (0.8 s): TEMPO page. '
                    "<b>SHIFT +</b>: metronome."),
-    ([23], "REC", '<a href="#recording">Record</a> into the steps. <b>SHIFT +</b>: <a href="#looper">looper</a>; '
+    ([23], "REC", '<a href="#recording">Record</a> into steps. <b>SHIFT +</b>: <a href="#looper">looper</a>; '
                   "<b>held</b>, track's loops."),
-    ([24], "black key 1", '<a href="#chord-mode">CHORD mode</a>; <b>SHIFT +</b>, next form. In the step view: '
+    ([24], "black key 1", '<a href="#chord-mode">CHORD mode</a>; <b>SHIFT +</b>, next form. In step view: '
                           'new <a href="#phrases">phrase</a> (<b>SHIFT +</b>: new locks; <b>held</b>: PHRASE page). '
-                          "With SHIFT held on the PATTERNS grid: empty a pattern."),
-    ([25], "black key 2", '<a href="#mute-mode">MUTE mode</a> (also on the PATTERNS grid). In the step view: TRACK '
+                          "With SHIFT held on PATTERNS grid: empty pattern."),
+    ([25], "black key 2", '<a href="#mute-mode">MUTE mode</a> (also on PATTERNS grid). In step view: TRACK '
                           "page."),
-    ([26], "black key 3", '<b>Held</b>: <a href="#break">BREAK</a>; <b>SHIFT +</b>, on every track. On the PATTERNS '
-                          "grid, with a white key held 0.8 s: save the break. In the step view: TRIG."),
-    ([27], "black key 4", '<a href="#midi-learn">MIDI LEARN</a>. In the step view: MOD.'),
+    ([26], "black key 3", '<b>Held</b>: <a href="#break">BREAK</a>; <b>SHIFT +</b>, on every track. On PATTERNS '
+                          "grid, with white key held 0.8 s: save break. In step view: TRIG."),
+    ([27], "black key 4", '<a href="#midi-learn">MIDI LEARN</a>. In step view: MOD.'),
     ([28], "black key 5", '<a href="#arpeggiator">Arpeggiator</a>; <b>held</b> (0.8 s), its page.'),
     ([29], "black key 6", '<b>SHIFT +</b> it held: <a href="#transform">TRANSFORM</a>; <b>held</b> alone (0.8 s), its '
-                          "page. In the step view: direction REVERSE."),
-    ([30], "black key 7", '<a href="#performance">PERFORMANCE</a> on or off (also on the PATTERNS grid). In the step '
+                          "page. In step view: direction REVERSE."),
+    ([30], "black key 7", '<a href="#performance">PERFORMANCE</a> on or off (also on PATTERNS grid). In step '
                           "view: direction PING-PONG; <b>SHIFT +</b>, PERFORMANCE."),
-    ([31], "black key 8", "In the step view: direction RANDOM. In CHROMATIC: a note."),
-    ([32], "black key 9", '<b>STEP</b>: <a href="#step-view">step view</a>. <b>SHIFT +</b>: empty the '
+    ([31], "black key 8", "In step view: direction RANDOM. In CHROMATIC: note."),
+    ([32], "black key 9", '<b>STEP</b>: <a href="#step-view">step view</a>. <b>SHIFT +</b>: empty '
                           "chosen track's steps."),
-    ([33], "black key 10", '<b>EDIT</b>: <a href="#sound-pages-edit">sound pages</a> (not the EDIT button, T5).'),
+    ([33], "black key 10", '<b>EDIT</b>: <a href="#sound-pages-edit">sound pages</a> (not EDIT button, T5).'),
     ([34], "black key 11", "<b>SHIFT</b>."),
-    ([35], "16 white keys", "Play the chosen track in the scale; the root's keys glow. In the step view: 16 steps. On "
-                            "the PATTERNS grid: 16 patterns; on the SESSIONS grid: 16 sessions."),
+    ([35], "16 white keys", "Play chosen track in scale; root's keys glow. In step view: 16 steps. On "
+                            "PATTERNS grid: 16 patterns; on SESSIONS grid: 16 sessions."),
 ]
 
 # KNOB 1-4 on each page
@@ -309,9 +309,9 @@ KNOB_PAGES = [
     ('<a href="#effects-seq">SEQ</a>', "row A (E)", "row B (F)", "row C (G)", "row D (H)"),
     ('<a href="#transform">TRANSFORM</a> page', "TRACKS", "STACK", "DEPTH", "MIX"),
     ('<a href="#arpeggiator">ARP</a> page', "MODE (LATCH)", "RATE (DENSITY)", "RANGE (OCT RND)", "GATE (BASS)"),
-    ('a step held, <a href="#step-view">step view</a>', "macro 1", "macro 2", "macro 3", "macro 4"),
-    ('a step held, <a href="#step-pages">TRIG</a> on', "note (RATCHET)", "velocity", "length", "condition"),
-    ('a step held, <a href="#step-pages">MOD</a> on', "MUTATE", "MUT EVERY", "MIDI FX", "FX EVERY"),
+    ('step held, <a href="#step-view">step view</a>', "macro 1", "macro 2", "macro 3", "macro 4"),
+    ('step held, <a href="#step-pages">TRIG</a> on', "note (RATCHET)", "velocity", "length", "condition"),
+    ('step held, <a href="#step-pages">MOD</a> on', "MUTATE", "MUT EVERY", "MIDI FX", "FX EVERY"),
     ('<a href="#phrases">PHRASE</a> page', "DENSITY", "COMPLEXITY", "", ""),
     ('TRACK page (<a href="#step-view">step view</a>)', "LENGTH", "CLOCK", "", ""),
 ]
@@ -400,14 +400,14 @@ def controls():
                         f"<td><b>{nm}</b></td>{cell}</tr>")
     pages = "\n".join("<tr>" + "".join(f"<td>{x}</td>" for x in r) + "</tr>" for r in KNOB_PAGES)
     return f"""<h2 id="controls">Controls</h2>
-<p>The numbers on the drawings are in the table below them; a number links to its row, and a row's number back to its drawing. The names are those printed on the FM-1. Black keys are counted from the left.</p>
+<p>Numbers on drawings are in table below them; each number links to its row, and each row's number back to its drawing. Names are those printed on FM-1. Black keys are counted from left.</p>
 <figure class="fm1-fig" id="fig-panel">
 <div class="fm1-scroll">{panel_svg()}</div>
-<figcaption>The panel (1–23).<span class="narrow"> Swipe sideways to see all of it.</span></figcaption>
+<figcaption>Panel (1–23).<span class="narrow"> Swipe sideways to see all of it.</span></figcaption>
 </figure>
 <figure class="fm1-fig" id="fig-keys">
 <div class="fm1-scroll">{keys_svg()}</div>
-<figcaption>The keys (24–35).<span class="narrow"> Swipe sideways to see all of it.</span></figcaption>
+<figcaption>Keys (24–35).<span class="narrow"> Swipe sideways to see all of it.</span></figcaption>
 </figure>
 <table class="controls">
 <tr><th>No.</th><th>Control</th><th>Under Quasar</th></tr>
@@ -428,7 +428,7 @@ def manual():
     body = controls() + "\n" + to_html(part, toc)
     t = "\n".join(f'<a href="#{s}"' + (' class="sub"' if lv == 3 else "") + f">{html.escape(n)}</a>" for lv, s, n in toc)
     bar = ('<div class="mbar" role="search">\n'
-           '<input type="search" id="msearch" placeholder="Search the manual" aria-label="Search the manual" '
+           '<input type="search" id="msearch" placeholder="Search manual" aria-label="Search manual" '
            'autocomplete="off" aria-controls="mresults" aria-expanded="false">\n'
            '<div id="mresults" class="mresults" role="listbox" hidden></div>\n'
            '</div>')
@@ -442,13 +442,13 @@ def manual():
                  '<a href="#top" data-tip="Back to top" aria-label="Back to top">'
                  + icon('<path d="M12 19V5M5 12l7-7 7 7"/>') + '</a>\n'
                  '</nav>')
-    intro = ('<h1 id="top">Manual</h1>\n' + bar + '\n<p>Everything the FM-1 does under Quasar. New here? Start with '
+    intro = ('<h1 id="top">Manual</h1>\n' + bar + '\n<p>Everything FM-1 does under Quasar. New here? Start with '
              '<a href="#controls">Controls</a> and <a href="#playing-it">Playing it</a>; to install, see '
              '<a href="install.html">Install</a>. Press <kbd>/</kbd> to search.</p>\n'
              f'<nav class="toc" id="contents" aria-label="Contents">\n{t}\n</nav>')
     (DOCS / "manual.html").write_text(page("Quasar manual", "Manual",
                                            '<div class="manual">\n' + intro + "\n" + body + "\n" + float_nav + "\n</div>",
-                                           "The Quasar manual: every control of the FM-1 under Quasar.",
+                                           "Quasar manual: every control of FM-1 under Quasar.",
                                            f'\n<script src="js/manual.js?v={MANUAL_JS_V}" defer></script>'))
 
 

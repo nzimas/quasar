@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Back up Quasar sessions</title>
-<meta name="description" content="Save the sessions on an M-VAVE FM-1 running Quasar to a file, and restore them, from your browser.">
+<meta name="description" content="Save sessions on M-VAVE FM-1 running Quasar to file, and restore them, from your browser.">
 <link rel="icon" href="assets/mark.svg?v=4e6823218d" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +21,7 @@
       <button class="menu-btn" type="button" aria-label="Menu" aria-controls="site-nav" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
     <nav id="site-nav" aria-label="Site">
-      <button class="menu-close" type="button" aria-label="Close the menu">&times;</button>
+      <button class="menu-close" type="button" aria-label="Close menu">&times;</button>
       <a href="./">Home</a>
       <a href="screens.html">Screens</a>
       <a href="install.html">Install</a>
@@ -45,38 +45,38 @@
   <div class="content">
     <main>
 <h1>Back up sessions</h1>
-<p>This page copies the sessions stored on an FM-1 running Quasar — each with its patterns and loops — and the
-  GLOBAL SETUP settings (MIDI, MIDI LEARN) to a file on this computer, and puts them back from that file. Use it
-  before you install another firmware (it may erase or overwrite them): when you reinstall Quasar, restore the
-  file here. It works in a desktop <b>Chrome, Edge or Opera</b>, over USB MIDI, and needs Quasar on the FM-1. Nothing is uploaded anywhere: the file stays on this computer.</p>
+<p>This page copies sessions stored on FM-1 running Quasar — each with its patterns and loops — and
+  GLOBAL SETUP settings (MIDI, MIDI LEARN) to file on this computer, and puts them back from that file. Use it
+  before you install another firmware (it may erase or overwrite them): when you reinstall Quasar, restore
+  file here. It works in desktop <b>Chrome, Edge or Opera</b>, over USB MIDI, and needs Quasar on FM-1. Nothing is uploaded anywhere: file stays on this computer.</p>
 
 <div class="panel" aria-live="polite">
   <p class="status" id="status">Not connected</p>
-  <p class="detail" id="detail">Connect the FM-1 with a USB data cable, switch it on, then find it.</p>
+  <p class="detail" id="detail">Connect FM-1 with USB data cable, switch it on, then find it.</p>
   <dl class="dev" id="facts" hidden>
-    <dt>On the FM-1</dt><dd id="f-dev"></dd>
-    <dt>In the file</dt><dd id="f-file">no file opened</dd>
+    <dt>On FM-1</dt><dd id="f-dev"></dd>
+    <dt>In file</dt><dd id="f-file">no file opened</dd>
   </dl>
   <div class="bar" id="bar" hidden><div></div></div>
   <div class="cta">
     <button class="btn" id="connect">Find my FM-1</button>
-    <button class="btn primary" id="save" disabled>Save to a file</button>
+    <button class="btn primary" id="save" disabled>Save to file</button>
   </div>
 </div>
 
 <h2>Restore</h2>
 <div class="panel">
-  <p>Open a backup file, then write it to the FM-1. Every session in the file replaces the one in the same slot on
-    the FM-1, with its patterns and loops; GLOBAL SETUP is replaced if the file holds it. The other sessions on the
+  <p>Open backup file, then write it to FM-1. Every session in file replaces one in same slot on
+    FM-1, with its patterns and loops; GLOBAL SETUP is replaced if file holds it. Other sessions on
     FM-1 are kept.</p>
   <div class="cta">
-    <label class="btn" for="file">Open a backup file</label>
+    <label class="btn" for="file">Open backup file</label>
     <input type="file" id="file" accept=".json,application/json" hidden>
   </div>
   <label class="check"><input type="checkbox" id="agree">
-    <span>I understand that the sessions in the file replace those in the same slots on the FM-1.</span></label>
+    <span>I understand that sessions in file replace those in same slots on FM-1.</span></label>
   <div class="cta">
-    <button class="btn primary" id="restore" disabled>Restore to the FM-1</button>
+    <button class="btn primary" id="restore" disabled>Restore to FM-1</button>
   </div>
   <div aria-live="polite">
     <p class="status" id="r-status" hidden></p>
@@ -87,16 +87,16 @@
 
 <h2>Notes</h2>
 <ul>
-  <li>Close any other program using MIDI (a DAW, M-VAVE's app), and allow MIDI access when the browser asks:
-    the sessions travel as MIDI system-exclusive messages.</li>
-  <li>The FM-1 keeps playing while this page works, but writing to its flash silences the audio for a moment
+  <li>Close any other program using MIDI (DAW, M-VAVE's app), and allow MIDI access when browser asks:
+    sessions travel as MIDI system-exclusive messages.</li>
+  <li>FM-1 keeps playing while this page works, but writing to its flash silences audio for a moment
     each time.</li>
   <li>Each part is copied whole and checked before it is written: one that does not arrive intact is not written.
-    A session's loops are written before the session, so a restore cut off leaves that session as it was.</li>
-  <li>The session playing on the FM-1 is not changed by a restore: load it again (SHIFT + SAVE, then its white key) to hear what
+    Session's loops are written before session, so restore cut off leaves that session as it was.</li>
+  <li>Session playing on FM-1 is not changed by restore: load it again (SHIFT + SAVE, then its white key) to hear what
     was restored. Save it first if it has changes you want to keep.</li>
 </ul>
-<p class="note">The page (<code>js/backup.js</code>) and the part of the firmware that answers it
+<p class="note">Page (<code>js/backup.js</code>) and part of firmware that answers it
   (<code>firmware/src/backup.c</code>) are GPL-3.0, <a href="https://github.com/nzimas/quasar">on GitHub</a>.
   They follow Bigorna's and Tonitor's backup page.</p>
 
@@ -104,7 +104,7 @@
     <footer>
       <p>Developed by Nuno Zimas. Firmware: GPL-3.0. Website and logo: MIT. <a href="https://github.com/nzimas/quasar">Source on GitHub</a>.</p>
       <p>M-VAVE and FM-1 are trademarks of their owner; SOMA Laboratory and Pulsar-23 are trademarks of SOMA Laboratory;
-        Elektron is a trademark of Elektron Music Machines. They are used only to say which device Quasar runs on and
+        Elektron is trademark of Elektron Music Machines. They are used only to say which device Quasar runs on and
         which instrument it takes as its model. Quasar is not made, endorsed or supported by any of them.</p>
       <form class="donate donate-foot" action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
         <input type="hidden" name="cmd" value="_xclick">

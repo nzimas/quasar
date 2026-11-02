@@ -65,15 +65,15 @@ const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 async function connect() {
   busy = true;
   refresh();
-  say("Looking for the FM-1…", "Allow MIDI access if the browser asks.");
+  say("Looking for FM-1…", "Allow MIDI access if browser asks.");
   try {
     if (!navigator.requestMIDIAccess)
-      throw new Error("This browser has no Web MIDI. Open this page in a desktop Chrome, Edge or Opera.");
+      throw new Error("This browser has no Web MIDI. Open this page in desktop Chrome, Edge or Opera.");
     if (!updater) updater = new Updater(await navigator.requestMIDIAccess({ sysex: true }));
     if (device) device.link.close();
     device = await updater.find();
     if (!device) {
-      say("No FM-1 found", "Check the cable (it must carry data), switch the FM-1 on, close other MIDI programs, and try again.", "bad");
+      say("No FM-1 found", "Check cable (it must carry data), switch FM-1 on, close other MIDI programs, and try again.", "bad");
       return;
     }
     onDevice = /^FM-1_7\d\d$/.test(device.id.text || "") ? await listOn(device.link) : null;
@@ -85,8 +85,8 @@ async function connect() {
     }
     ui.facts.hidden = false;
     ui.dev.textContent = describe(onDevice);
-    say("FM-1 found", onDevice.length ? "Save its sessions to a file, or restore a file to it." :
-      "It holds no sessions yet. You can restore a file to it.", "ok");
+    say("FM-1 found", onDevice.length ? "Save its sessions to file, or restore file to it." :
+      "It holds no sessions yet. You can restore file to it.", "ok");
   } catch (e) {
     say("Something went wrong", e.message, "bad");
   } finally {
@@ -120,7 +120,7 @@ async function save() {
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     say("Saved", `${describe(onDevice)} written to ${a.download} (in your downloads).`, "ok");
   } catch (e) {
-    say("The backup did not finish", e.message, "bad");
+    say("Backup did not finish", e.message, "bad");
   } finally {
     progress(null);
     busy = false;
@@ -135,16 +135,16 @@ async function openFile() {
   if (!f) return refresh();
   try {
     const j = JSON.parse(await f.text());
-    if (j.format !== "quasar-backup" || !Array.isArray(j.records)) throw new Error("This is not a Quasar backup file.");
+    if (j.format !== "quasar-backup" || !Array.isArray(j.records)) throw new Error("Not a Quasar backup file.");
     const recs = j.records.map((r) => ({ number: r.number, bytes: unb64(r.data) }));
     if (recs.some((r) => !Number.isInteger(r.number) || r.bytes.length < 16 || r.bytes.length > 4096))
-      throw new Error("The file is damaged.");
+      throw new Error("File is damaged.");
     backup = restoreOrder(recs);
     ui.facts.hidden = false;
     ui.fileInfo.textContent = `${describe(recs)}, saved ${(j.saved || "").slice(0, 10)}`;
-    rsay(device ? "File opened" : "File opened: now find the FM-1 (above)", "Tick the box, then restore it.");
+    rsay(device ? "File opened" : "File opened: now find FM-1 (above)", "Tick box, then restore it.");
   } catch (e) {
-    rsay("The file could not be opened", e.message, "bad");
+    rsay("File could not be opened", e.message, "bad");
   }
   refresh();
 }
@@ -161,16 +161,16 @@ async function restore() {
     const total = backup.reduce((a, r) => a + r.bytes.length, 0);
     let sent = 0;
     rprogress(0);
-    if (!(await listOn(device.link))) throw new Error("The FM-1 does not answer.");   // (a restore starts afresh)
+    if (!(await listOn(device.link))) throw new Error("FM-1 does not answer.");   // (a restore starts afresh)
     for (const r of backup) {
       rsay(`Restoring… ${Math.round((sent / total) * 100)}%`, named(r.number));
       await writeOn(device.link, r.number, r.bytes, (n) => rprogress((sent += n) / total));
     }
     onDevice = await listOn(device.link);
     if (onDevice) ui.dev.textContent = describe(onDevice);
-    rsay("Restored", `${describe(backup)} written to the FM-1. Load a session on the FM-1 to hear it.`, "ok");
+    rsay("Restored", `${describe(backup)} written to FM-1. Load session on FM-1 to hear it.`, "ok");
   } catch (e) {
-    rsay("The restore did not finish", e.message + " What was written before stays; run it again to finish.", "bad");
+    rsay("Restore did not finish", e.message + " What was written before stays; run it again to finish.", "bad");
   } finally {
     window.removeEventListener("beforeunload", guard);
     rprogress(null);
@@ -184,5 +184,5 @@ ui.save.addEventListener("click", save);
 ui.file.addEventListener("change", openFile);
 ui.agree.addEventListener("change", refresh);
 ui.restore.addEventListener("click", restore);
-if (!window.isSecureContext) say("Open this page over https", "Web MIDI only works on a secure page.", "bad");
+if (!window.isSecureContext) say("Open this page over https", "Web MIDI only works on secure page.", "bad");
 refresh();

@@ -32,21 +32,21 @@ async function loadFirmware() {
     const raw = new Uint8Array(await r.arrayBuffer());
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", raw));
     const hex = [...digest].map((b) => b.toString(16).padStart(2, "0")).join("");
-    if (hex !== meta.sha256) throw new InstallError("badpkg", "The firmware did not download intact. Reload the page.");
+    if (hex !== meta.sha256) throw new InstallError("badpkg", "Firmware did not download intact. Reload page.");
     pkg = { ...loadPackage(raw), version: meta.version };
     ui.fw.textContent = `Quasar ${meta.version} (${pkg.product})`;
     ui.facts.hidden = false;
     if (!navigator.requestMIDIAccess) {
-      say("This browser cannot reach the FM-1",
-        "It has no Web MIDI. Open this page in a desktop Chrome, Edge or Opera.", "bad");
+      say("This browser cannot reach FM-1",
+        "It has no Web MIDI. Open this page in desktop Chrome, Edge or Opera.", "bad");
       pkg = null;
     } else if (!window.isSecureContext) {
-      say("Open this page over https", "Web MIDI only works on a secure page.", "bad");
+      say("Open this page over https", "Web MIDI only works on secure page.", "bad");
       pkg = null;
     } else
-      say("Ready", "Tick the box below, then find your FM-1.");
+      say("Ready", "Tick box below, then find your FM-1.");
   } catch (e) {
-    say("The firmware could not be loaded", e.message, "bad");
+    say("Firmware could not be loaded", e.message, "bad");
   }
   refresh();
 }
@@ -54,34 +54,34 @@ async function loadFirmware() {
 async function connect() {
   busy = true;
   refresh();
-  say("Looking for the FM-1…", "Allow MIDI access if the browser asks.");
+  say("Looking for FM-1…", "Allow MIDI access if browser asks.");
   try {
     if (!updater) updater = new Updater(await navigator.requestMIDIAccess({ sysex: true }));
     if (device) device.link.close();
     device = await updater.find();
     if (!device) {
       ui.dev.textContent = "not found";
-      say("No FM-1 found", "Is it switched on and connected with a data cable? Is another program using it? " +
+      say("No FM-1 found", "Is it switched on and connected with data cable? Is another program using it? " +
         "Then try again.", "bad");
     } else {
-      const mode = device.id.loader ? " — in update mode: the install will finish the write" : "";
+      const mode = device.id.loader ? " — in update mode: install will finish write" : "";
       ui.dev.textContent = `${device.id.text}${mode}`;
       say("FM-1 found", "Press Install Quasar. Do not unplug it or close this page until it has restarted.");
     }
   } catch (e) {
-    say("MIDI access was refused", "This page needs MIDI with system-exclusive messages to update the FM-1. " +
-      "Allow it in the site settings, then reload.", "bad");
+    say("MIDI access was refused", "This page needs MIDI with system-exclusive messages to update FM-1. " +
+      "Allow it in site settings, then reload.", "bad");
   }
   busy = false;
   refresh();
 }
 
 const STEP = {
-  start: () => ["Starting the update", "The FM-1 checks the firmware."],
-  check: (n) => ["Checking", `The FM-1 has read ${n} parts of the firmware.`],
-  loader: () => ["Switching to update mode", "The FM-1 restarts into its update loader. It may take a few seconds."],
-  write: (p) => [`Writing ${p}%`, "Do not unplug the FM-1 or close this page."],
-  reboot: () => ["Restarting", "The FM-1 restarts into Quasar."],
+  start: () => ["Starting update", "FM-1 checks firmware."],
+  check: (n) => ["Checking", `FM-1 has read ${n} parts of firmware.`],
+  loader: () => ["Switching to update mode", "FM-1 restarts into its update loader. It may take a few seconds."],
+  write: (p) => [`Writing ${p}%`, "Do not unplug FM-1 or close this page."],
+  reboot: () => ["Restarting", "FM-1 restarts into Quasar."],
 };
 
 async function install() {
@@ -100,10 +100,10 @@ async function install() {
     });
     ui.fill.style.width = "100%";
     ui.dev.textContent = text;
-    say("Done: your FM-1 runs Quasar", "Read the manual to get started.", "ok");
+    say("Done: your FM-1 runs Quasar", "Read manual to get started.", "ok");
   } catch (e) {
     const msg = e instanceof InstallError ? e.message : `Unexpected error: ${e.message}`;
-    say("The install stopped", msg + "\nReload this page and try again; see “If something goes wrong” below.", "bad");
+    say("Install stopped", msg + "\nReload this page and try again; see “If something goes wrong” below.", "bad");
   }
   device = null;
   window.removeEventListener("beforeunload", guard);

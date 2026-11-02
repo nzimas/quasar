@@ -104,7 +104,7 @@ export function parseIdentity(pkt) {
 
 /** the package identity ("FM-1_700"): one marker byte after each of the first 20 blocks */
 export function productOf(raw) {
-  if (raw.length < BLOCKS * BLK) throw new InstallError("badpkg", "not an FM-1 package (too short)");
+  if (raw.length < BLOCKS * BLK) throw new InstallError("badpkg", "not FM-1 package (too short)");
   let s = "";
   for (let i = 0; i < BLOCKS; i++) {
     const m = raw[i * BLK + KEEP];
@@ -171,7 +171,7 @@ export function packageDamage(image) {
 /** raw .fwsc bytes -> {product, image}; throws InstallError("badpkg") */
 export function loadPackage(raw) {
   const product = productOf(raw);
-  if (!/^[^_]+_\d+$/.test(product)) throw new InstallError("badpkg", `not an FM-1 package (identity ${product})`);
+  if (!/^[^_]+_\d+$/.test(product)) throw new InstallError("badpkg", `not FM-1 package (identity ${product})`);
   const mark = new TextEncoder().encode(LOADER_MARK);
   let found = false;
   outer: for (let i = 0; i + mark.length <= raw.length; i++) {
@@ -182,7 +182,7 @@ export function loadPackage(raw) {
   if (!found) throw new InstallError("badpkg", "no Felucca update loader in this package");
   const image = logicalImage(raw);
   const bad = packageDamage(image);
-  if (bad) throw new InstallError("badpkg", `damaged package (${bad}); nothing was written. Reload the page.`);
+  if (bad) throw new InstallError("badpkg", `damaged package (${bad}); nothing was written. Reload page.`);
   return { product, image };
 }
 
@@ -339,7 +339,7 @@ export class Updater {
         continue;
       }
       if (r.len > MAXDATA || r.addr + r.len > image.length)
-        throw new InstallError("badreq", `the device asked for 0x${r.addr.toString(16)}+${r.len}, outside the package`);
+        throw new InstallError("badreq", `device asked for 0x${r.addr.toString(16)}+${r.len}, outside package`);
       if (DELAY.reply) await sleep(DELAY.reply);
       if (!link.send(response(r.addr, image.subarray(r.addr, r.addr + r.len), r.fl)))
         return { served, finished: false, lost: true };
@@ -356,13 +356,13 @@ export class Updater {
     dev.link.close();
     if (!r.finished)
       throw new InstallError(r.lost ? "lost" : "stopped",
-        `The FM-1 ${r.lost ? "was disconnected" : "stopped answering"} after ${r.served} requests. Nothing was written.`);
+        `FM-1 ${r.lost ? "was disconnected" : "stopped answering"} after ${r.served} requests. Nothing was written.`);
     step("loader");
     await sleep(DELAY.loader);
     const ota = await this.waitFor((i) => i.loader, DELAY.waitLoader);
     if (!ota)
-      throw new InstallError("noloader", "The update loader did not appear. Replug the USB cable and run the install " +
-        "again: the FM-1 stays in update mode until it is done.");
+      throw new InstallError("noloader", "Update loader did not appear. Replug USB cable and run install " +
+        "again: FM-1 stays in update mode until it is done.");
     return ota;
   }
 
@@ -375,8 +375,8 @@ export class Updater {
     ota.link.close();
     if (!r.finished)
       throw new InstallError(r.lost ? "lost" : "stopped",
-        `The loader ${r.lost ? "was disconnected" : "stopped answering"} after ${r.served} requests. Replug the USB ` +
-        "cable and run the install again to finish.");
+        `Loader ${r.lost ? "was disconnected" : "stopped answering"} after ${r.served} requests. Replug USB ` +
+        "cable and run install again to finish.");
     step("write", 100);
   }
 
@@ -384,10 +384,10 @@ export class Updater {
     step("reboot");
     await sleep(DELAY.reboot);
     const back = await this.waitFor((i) => !i.loader, DELAY.waitReboot);
-    if (!back) throw new InstallError("noreturn", "The FM-1 did not come back: switch it off and on again.");
+    if (!back) throw new InstallError("noreturn", "FM-1 did not come back: switch it off and on again.");
     back.link.close();
     if (back.id.text !== product)
-      throw new InstallError("mismatch", `Written, but the FM-1 reports ${back.id.text} (expected ${product}).`);
+      throw new InstallError("mismatch", `Written, but FM-1 reports ${back.id.text} (expected ${product}).`);
     step("done", back.id.text);
     return back.id.text;
   }
@@ -396,11 +396,11 @@ export class Updater {
   async install(dev, image, product, step = () => {}) {
     if (modelOf(dev.id.text) !== modelOf(product)) {
       dev.link.close();
-      throw new InstallError("model", `The device is ${dev.id.text}; this firmware is for ${product}.`);
+      throw new InstallError("model", `Device is ${dev.id.text}; this firmware is for ${product}.`);
     }
     if (dev.id.loader && !/^ota-FM-1_9\d\d$/i.test(dev.id.text)) {
       dev.link.close();   // another firmware's loader: its image layout may differ
-      throw new InstallError("foreign", `The FM-1 is in the update mode of another firmware (${dev.id.text}). ` +
+      throw new InstallError("foreign", `FM-1 is in update mode of another firmware (${dev.id.text}). ` +
         "Finish that update with its own updater (M-UPGRADE), then install again.");
     }
     const ota = dev.id.loader ? dev : await this.check(dev, image, step);

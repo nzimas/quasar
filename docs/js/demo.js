@@ -71,7 +71,7 @@
       if (cur !== li) return;
       li.classList.remove("wait");
       cur = null;
-      state.textContent = "Could not load the demo";
+      state.textContent = "Could not load demo";
     });
   }
   rows.forEach(function (li) {
