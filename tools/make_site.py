@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # QUASAR (as BIGORNA's and TONITOR's): the website's generated parts, in docs/ (GitHub Pages):
-#   docs/index.html, screens, install, backup, projects, apps   site/*.html in the common frame (the home page's
-#                        demos: docs/assets/demo/, `build/host demo` then tools/make_loop.py; its player js/demo.js)
+#   docs/index.html, screens, install, backup, projects, apps   site/*.html in the common frame (js/demo.js plays demo
+#                        loops from docs/assets/demo/ -- `build/host demo` then tools/make_loop.py -- when the home page has them)
 #   docs/manual.html     the README's manual (from "# Manual" to "# Building from source")
 #   docs/changelog.html  CHANGELOG.md
 #   docs/firmware/       the package the browser installer writes, and latest.json (its file, version, SHA-256)
@@ -209,12 +209,10 @@ def page(title, current, body, desc, head=""):
 
 def fragments():
     src = ROOT / "site"
-    demo_v = hashlib.sha256((DOCS / "js" / "demo.js").read_bytes()).hexdigest()[:10]
     (DOCS / "index.html").write_text(page(
         "Quasar — a firmware for the M-VAVE FM-1", "Home", (src / "home.html").read_text().replace("{LOGO_V}", LOGO_V),
         "Quasar: a firmware for the M-VAVE FM-1 for experimental IDM, after the SOMA Pulsar-23, with an audio engine "
-        "written from scratch.",
-        f'\n<script src="js/demo.js?v={demo_v}" defer></script>'))
+        "written from scratch."))
     (DOCS / "screens.html").write_text(page(
         "Quasar on the FM-1's screen", "Screens", (src / "screens.html").read_text(),
         "Quasar on the M-VAVE FM-1's screen: the track view, the sound's pages, STUTTER, PERFORMANCE and the sessions."))

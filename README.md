@@ -797,7 +797,7 @@ under AddressSanitizer and UndefinedBehaviorSanitizer when its DSP changes. Vers
 
 `tools/build.py --telemetry` builds a diagnostic version that reports the audio's timing over USB MIDI;
 `tools/telelog.py` reads it. `build/host render DIR N` writes N drawings of every sound family as WAV;
-`build/host demo DIR` renders the website's demos, which `tools/make_loop.py` masters into loops.
+`build/host demo DIR` renders demo phrases, which `tools/make_loop.py` masters into loops.
 `tools/make_logo.py` draws the logo and the home page's art; `tools/make_site.py` writes the website into `docs/`.
 
 # Credits
