@@ -11,13 +11,10 @@ A firmware for the M-VAVE FM-1, for experimental IDM, after the SOMA Pulsar-23.
 
 Quasar models the Pulsar-23 as a whole instrument -- its BD, BASS, SD and HHT circuits, its SHAOS shift register,
 LFO, clock and dividers, FX processor and distortion -- with an audio engine written from scratch for the FM-1's chip,
-then pushes it toward broken, fractured, polymetric rhythm: Autechre more than anything else, rhythmic noise as an
-afterthought. Six tracks, 16 engine profiles, 147 sound families, macros and internal routes, WRECK, a stutter, a
-phrase generator with polymeters, ten BREAK ways, and a PERFORMANCE mode. The name is the idea: a quasar is a galaxy's
-core throwing out jets at nearly the speed of light -- raw energy, released all at once.
+aimed at experimental IDM. 6 tracks, 16 engine profiles, 147 sound families, macros and internal routes, WRECK, a
+stutter, a phrase generator with polymeters, 10 BREAK ways and a PERFORMANCE mode.
 
-Website, browser installer and manual: <https://nzimas.github.io/quasar/>. What was taken from the Pulsar-23, block
-diagrams of the circuits as modelled, and where the FM-1 forced compromises: [Lineage](https://nzimas.github.io/quasar/lineage.html).
+Website, browser installer and manual: <https://nzimas.github.io/quasar/>.
 
 > [!WARNING]
 > Quasar is unofficial. It is not made, endorsed or supported by M-VAVE or SOMA Laboratory, and installing it may
@@ -75,7 +72,7 @@ From the command line (macOS or Linux): `./setup.sh` once, then `./install.sh` (
 | **MASTER** | output level. |
 | MIDI in (USB and TRS) | notes and CCs for each track ([MIDI](#midi)). |
 
-While a macro knob turns, the screen shows its value as a large dial for a second.
+While a macro knob turns, the screen shows its value as a large dial for 1 s.
 
 ![Track view](docs/assets/screens/native_track_view1.png)
 
@@ -83,10 +80,10 @@ While a macro knob turns, the screen shows its value as a large dial for a secon
 
 Quasar models the SOMA Pulsar-23 drum synthesizer with an engine written from scratch. It follows the instrument's
 published behaviour; no circuit values were available, and it has not been compared by ear with a real Pulsar-23.
-Its voice is aggressive on purpose: IDM first, rhythmic noise second.
+It is aimed at IDM 1st, rhythmic noise 2nd.
 
 6 tracks, each with its own engine profile, sound, octave, level, pan, steps and loops. There are no subtracks. Each
-track is one circuit and sounds one note at a time: a new note strikes it again at the new pitch. Every sound is
+track is 1 circuit and sounds 1 note at a time: a new note strikes it again at the new pitch. Every sound is
 percussive: it falls once its attack peaks, whether the key is held or not.
 
 There is no TUNE control. Every circuit takes its pitch from the note played, drums too, so drums follow the scale.
@@ -95,21 +92,21 @@ each recipe sets an offset from it.
 
 Velocity sets how hard a circuit is struck. The keys always play at full velocity.
 
-The FM-1's second processor core renders about half the sounding tracks. If it ever faults, the first core carries
+The FM-1's 2nd processor core renders about half the sounding tracks. If it ever faults, the 1st core carries
 on alone until the FM-1 is switched off, and the screen says **1 CORE**.
 
 The start (and a new session): track 1 HAMMER, 2 GRIND, 3 WALL, 4 HHT, 5 SKIN, 6 STATIC, track 1 an octave down.
 
 ### Engine profiles
 
-**PRESETS** chooses the chosen track's profile: a circuit and one of its modes. BD, SD, HHT and BASS are the
+**PRESETS** chooses the chosen track's profile: a circuit and 1 of its modes. BD, SD, HHT and BASS are the
 Pulsar-23's 4 voices; the others are modes written for Quasar that go past the instrument.
 
 | Profile | Circuit | What it is |
 | --- | --- | --- |
 | **BD** | BD | the Pulsar's kick: a triangle core with a pitch sweep at each strike, shaped from triangle to sine to square. Kicks, toms, zaps |
 | **HAMMER** | BD | the BD core folded over 1 to 9 times, a low noise rumble that outlasts the strike, a click and a hard clip: industrial impact, gabber, doom |
-| **SKIN** | BD | a struck membrane, its fundamental and a second mode, with a stick click: war toms, tabla, surdo |
+| **SKIN** | BD | a struck membrane, its fundamental and a 2nd mode, with a stick click: war toms, tabla, surdo |
 | **SD** | SD | the Pulsar's snare: pink noise and a pitched noise, a clap, a resonant band-pass |
 | **WALL** | SD | power noise: sample-rate crush, dropped bits, a rhythmic chop, a screaming band-pass and a hard clip. No clap |
 | **WIRE** | SD | the snare noise through a comb 2 octaves above the note: buzz, rattle, tin |
@@ -197,7 +194,7 @@ page). REL stops growing at 57: every sound is short.
 
 A stage after the sound's overdrive: **FOLD** (a triangle wavefolder), **RING** (a ring modulator with its own sine),
 **RING FRQ** (its frequency, 20 Hz to 5 kHz, whatever the note), **CRUSH** (sample-rate reduction), and on E,
-**BITS** (up to 12 bits dropped). All at 0 bypass it. About half of all new sounds come with one or two of them.
+**BITS** (up to 12 bits dropped). All at 0 bypass it. About half of all new sounds come with 1 or 2 of them.
 Phrases lock them step by step, and BREAK's WRECK layer throws them onto single hits.
 
 ### Macros
@@ -239,7 +236,7 @@ lower takes away, higher adds. Each moves up to 4 of the circuit's knobs at once
 | | RESO | low-pass Q, cutoff a little down |
 
 The knobs moved keep their meaning in the mode: SNAP on WALL moves CHOP and BITS. A [route](#routes) set to M1–M4 or
-M8 is scaled by that macro too (0 off, 50 as set, 100 about twice), so CHAOS and MOTION open or close a sound's
+M8 is scaled by that macro too (0 off, 50 as set, 100 about 2×), so CHAOS and MOTION open or close a sound's
 modulation.
 
 Macros 5–7 are the sound's own DRIVE, FX send and ATTACK. **DRIVE** is the voice's overdrive: a pre-emphasis, an
@@ -260,11 +257,11 @@ ROUTE 1 shows routes 1 (A–D) and 2 (E–H); ROUTE 3 routes 3 and 4. Each route
 EXT feeds the source into the circuit as audio; DRIVE and VCA push the sound's drive and level. A route from another
 track's OUT gives cross-modulation and feedback between tracks. The panel's utility pins (VCAs, switches, attenuators,
 pulse converters, diode, capacitors, TOUCH and MIDI CV) need cables on the Pulsar-23; Quasar has none, so they give
-nothing useful. A route arrives about 0.73 ms late; those other than EXT are followed every fourth sample.
+nothing useful. A route arrives about 0.73 ms late; those other than EXT are followed every 4th sample.
 
 ## Keys and scales
 
-The white keys play the chosen track in the scale: the first key is the root, each key the next degree. The keys
+The white keys play the chosen track in the scale: the 1st key is the root, each key the next degree. The keys
 that play the root glow dimly. USB and TRS MIDI notes play the chosen track as the keys do ([MIDI](#midi)).
 
 ### Scales
@@ -292,13 +289,13 @@ note, in the scale. **SHIFT +** black key 1 chooses the next form: TRIAD, INV 1,
 The form shows at the top left. Steps, recording and the looper take the chords. Tracks on the BD circuit (BD,
 HAMMER, SKIN) take no chords: NO CHORDS shows.
 
-A track sounds one note at a time, so a chord is heard as its last note only. CHORD mode matters most as a way to
+A track sounds 1 note at a time, so a chord is heard as its last note only. CHORD mode matters most as a way to
 write chords into steps and loops, and to feed the [arpeggiator](#arpeggiator).
 
 ### Arpeggiator
 
 Black key 5 turns the chosen track's arpeggiator on or off (lit while on; ARP shows at the top left). The keys held,
-and MIDI notes for the track, then play one at a time on the tempo's grid: with the sequencer's 16ths while it plays,
+and MIDI notes for the track, then play 1 at a time on the tempo's grid: with the sequencer's 16ths while it plays,
 on their own at the tempo while it is stopped. With CHORD mode on, each key gives it the chord's notes.
 
 **Hold black key 5** (0.8 s) to open or close the ARP page (KNOB 1–4 rows A to D; PRESETS right, E to H):
@@ -344,27 +341,27 @@ While the sequencer plays, **hold black key 3** to break up the chosen track's p
 It works from any page out of the step view, and on the PATTERNS grid. Nothing is written into the steps: when the
 key is let go, the pattern carries on from where it would have been.
 
-Each press draws a plan: one way of playing the steps, shown on the screen, and layers on top. Held, a new plan comes
-about every other bar, never the same way twice running. The break starts on the track's next beat:
+Each press draws a plan: 1 way of playing the steps, shown on the screen, and layers on top. Held, a new plan comes
+about every other bar, never the same way 2 times running. The break starts on the track's next beat:
 
 | Way | What plays |
 | --- | --- |
 | REPEAT 1, 2, 4 or 8 | window of that many steps, played over and over |
 | HALF TIME | steps at half speed |
 | DOUBLE | steps at double speed |
-| REVERSE 4 or 8 | each window of 4 or 8 steps backwards, its first step in place |
-| CHOP | bar's 4 beats shuffled, the first in place |
+| REVERSE 4 or 8 | each window of 4 or 8 steps backwards, its 1st step in place |
+| CHOP | bar's 4 beats shuffled, the 1st in place |
 | ROLL | steps as written, with more ratchets |
 | SHUFFLE | bar's 16 steps in another order |
 | POLY | each track round its own window of 3, 5, 6, 7 or 9 steps, against the bar |
 | JUMP | each beat a leap to another beat |
 | SKIP | steps read 3, 5, 7, 9 or 11 at a time through the bar |
 
-The layers, each drawn at random (at least one): ratchets (up to 8, faster the longer the key is held), octave leaps
+The layers, each drawn at random (at least 1): ratchets (up to 8, faster the longer the key is held), octave leaps
 on melodic tracks, flams on drums, accents (full on the beat, softer between), **RISE** (hits climbing in pitch
 through each half bar), **WRECK** (single hits folded, crushed, bit-reduced or rung), **STUT** (the
 [STUTTER](#stutter) thrown in for a beat or so, with its own slice, speed and roll) and **GHOST** (soft hits on empty
-steps). A kick keeps the bar's first step, takes few ratchets and no leaps, rises or ghosts. Nothing drops out. Loops
+steps). A kick keeps the bar's 1st step, takes few ratchets and no leaps, rises or ghosts. Nothing drops out. Loops
 play on as recorded.
 
 **Saving a break.** On the PATTERNS grid, with black key 3 held and the sequencer playing, hold a white key 0.8 s: the
@@ -390,10 +387,10 @@ on the page. The panel belongs to the session.
 The Pulsar-23's CLOCK, LOOPER, ATTEN, CV and PATCH pages are not shown: without cables none of them sounds, and Quasar
 runs with no cables. The clock follows the session tempo.
 
-**The FX processor** is one delay and one reverb, after the Pulsar-23's. Every sound's FX send goes to the delay or to
+**The FX processor** is 1 delay and 1 reverb, after the Pulsar-23's. Every sound's FX send goes to the delay or to
 the reverb, as **FX TO** says. **TIME** sets the delay (1 ms to about 0.6 s; it does not follow the tempo), **FB** the
 delay's feedback and the reverb's decay. **MODE**: BPF puts a band-pass (**TUNE**) in the delay's feedback; DBL a
-second tap (TUNE); PCH a pitch shifter of up to an octave either way (TUNE) in the delay, and the opposite one in the
+2nd tap (TUNE); PCH a pitch shifter of up to an octave either way (TUNE) in the delay, and the opposite one in the
 reverb. **MAD!**: in BPF and PCH, delay reads that follow the signal, feedback past unity with clipping, random pitch
 jumps; in DBL, stereo outputs. CLK MOD does nothing: it needs a cable.
 
@@ -531,12 +528,12 @@ The black keys, lit dimly, do this in the step view:
 
 **TRIG**: KNOB 1 the step's note (in the scale), 2 its velocity, 3 its length, 4 its trig condition; with PRESETS turned
 right, KNOB 1 its RATCHET (the step played 2, 3, 4, 6 or 8 times). The conditions are the Digitone II's: PRE and !PRE
-(as the last condition was met or not), NEI and !NEI (as the track before met its condition), 1ST and !1ST (the first
+(as the last condition was met or not), NEI and !NEI (as the track before met its condition), 1ST and !1ST (the 1st
 time through), probabilities, and A:B (the A-th time of every B).
 
 **MOD**: KNOB 1 MUTATE (the note moved by up to N steps of the scale, or RND), 2 MUT EVERY (how often), 3 MIDI FX
 (ECHO, ECHO UP, ECHO DN, STUTTER, FLAM, LATE, GRACE, FIFTH, TRIAD, OCT UP, OCT DN, DROP), 4 FX EVERY. FIFTH, TRIAD and
-the octaves sound with the note, so on a track that sounds one note at a time the added note takes its place.
+the octaves sound with the note, so on a track that sounds 1 note at a time the added note takes its place.
 
 ### Phrases
 
@@ -548,10 +545,10 @@ A phrase also sets the track's length, clock and direction:
 
 - **Polymeters**: most often the track gets its own length (5, 7, 9, 11, 13 steps and others) against the bar; kicks
   less often.
-- Hats, noise and percussion sometimes run twice as fast or at half speed; any role but the kick sometimes runs
+- Hats, noise and percussion sometimes run 2× as fast or at half speed; any role but the kick sometimes runs
   backwards, ping-pong or at random.
-- A **generative layer**, about one phrase in three and more often as COMPLEXITY rises: two Euclidean rhythms of other
-  lengths crossed over the steps, ratchets mostly in threes, hits pulled late or graced, velocities walking,
+- A **generative layer**, about 1 phrase in 3 and more often as COMPLEXITY rises: 2 Euclidean rhythms of other
+  lengths crossed over the steps, ratchets mostly in 3s, hits pulled late or graced, velocities walking,
   conditions on most steps.
 
 The locks move the macros (cutoff, drive, decay, attack, FX send, macro 8), the VOL, the pan and WRECK (BITS, CRUSH,
@@ -576,9 +573,9 @@ loops a track, up to 256 notes each.
 
 | To | Do this |
 | --- | --- |
-| See the track's loops | hold SHIFT + REC: they show on the first 3 white keys (lit: playing; dim: muted) |
+| See the track's loops | hold SHIFT + REC: they show on white keys 1–3 (lit: playing; dim: muted) |
 | Mute a loop, or bring it back | with SHIFT + REC held, press its key |
-| Empty one loop | with SHIFT + REC held, hold its key 0.8 s |
+| Empty a loop | with SHIFT + REC held, hold its key 0.8 s |
 | Empty all the track's loops | hold SHIFT + REC 1.5 s without touching a key |
 
 A loop belongs to the pattern it was recorded in. Another pattern does not play it, and an empty pattern plays
@@ -694,7 +691,7 @@ jack (TRS Type A). The settings follow the Model:Cycles' MIDI CONFIG:
 
 **Clock in.** With CLK IN on, the FM-1 follows the clock that arrives: its tempo, START (from step 1), CONTINUE (from
 the song position) and STOP. The sending device must send its transport as well as its clock. The TEMPO page shows
-EXT TEMPO. If the clock stops for half a second, the FM-1 goes back to its own tempo.
+EXT TEMPO. If the clock stops for 0.5 s, the FM-1 goes back to its own tempo.
 
 **Clock out.** With CLK OUT on, the FM-1 sends its clock all the time, so another device can lock to it before it
 starts; PLAY sends START, stopping sends STOP.
@@ -721,8 +718,8 @@ turning a parameter sends its page's CC, and the level, pan and mutes as they ch
 **Program changes** 0 to 15 choose patterns 1 to 16, in time as the PATTERNS grid does.
 
 The jack takes everything USB does except SysEx. With both inputs on they are merged; a clock should come from only
-one of them. A controller cannot be plugged straight into the FM-1's USB-C port (both are USB devices and need a
-computer between them); one with a 5-pin MIDI OUT goes into the jack.
+1 of them. A controller cannot be plugged straight into the FM-1's USB-C port (both are USB devices and need a
+computer between them); a controller with a 5-pin MIDI OUT goes into the jack.
 
 ### MIDI LEARN
 
@@ -738,7 +735,7 @@ chooses the row; **OCT− / OCT+** turn the pages.
 
 A learned sound parameter moves on the track it was learned on; a panel page's for all; DUCK and AUTO rows on their
 track. The ARP page, AUTO's DEST rows and the pages not shown cannot be learned. Each CC and channel
-controls one parameter, and each parameter has one CC. Up to 64 are kept, with GLOBAL SETUP. RECEIVE CC must be on.
+controls 1 parameter, and each parameter has 1 CC. Up to 64 are kept, with GLOBAL SETUP. RECEIVE CC must be on.
 
 ## USB audio
 
@@ -780,7 +777,7 @@ seconds while it runs: the chip's own update mode, from which a firmware can be 
 Needs macOS or Linux, Python 3, and on macOS Docker Desktop (JieLi's toolchain is Linux x86-64 only).
 
 ```
-./setup.sh                  # once: a Python environment, JieLi's toolchain, three files of the AC79 SDK
+./setup.sh                  # once: a Python environment, JieLi's toolchain, 3 files of the AC79 SDK
 ./build.sh                  # writes build/quasar.fwsc
 ./install.sh --no-build     # installs it on the FM-1 connected over USB
 tests/run_tests.sh          # the host tests: no FM-1 or toolchain needed

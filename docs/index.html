@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Unbounded:wght@700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/site.css?v=bf99baf0ce">
+<link rel="stylesheet" href="css/site.css?v=3b904a9164">
 <script src="js/demo.js?v=0d171ba6cb" defer></script>
 </head>
 <body>
@@ -23,7 +23,6 @@
     <nav id="site-nav" aria-label="Site">
       <button class="menu-close" type="button" aria-label="Close the menu">&times;</button>
       <a href="./" aria-current="page">Home</a>
-      <a href="lineage.html">Lineage</a>
       <a href="screens.html">Screens</a>
       <a href="install.html">Install</a>
       <a href="backup.html">Backup</a>
@@ -47,27 +46,22 @@
     <main>
 <div class="hero">
   <img class="art" src="assets/hero.svg?v=4e6823218d" alt="" width="1200" height="440">
-  <p class="tagline">M-VAVE FM-1 · after the SOMA Pulsar-23 · engine written from scratch</p>
-  <h1>A firmware for experimental IDM, built around raw energy</h1>
-  <p>Quasar turns the FM-1 into a percussion synthesizer modelled on the SOMA Pulsar-23: its kick, bass, snare and
-    hat circuits, its SHAOS shift register, LFO, clock dividers and FX processor, rewritten from nothing for the FM-1's
-    chip. It is made for broken, fractured, polymetric rhythm: Autechre more than anything else, rhythmic noise as an
-    afterthought. Every sound is percussive and every sound is hard.</p>
-  <p>A quasar is among the brightest things in the universe: a galaxy's core, where a black hole throws out jets of
-    matter at nearly the speed of light and outshines every star around it. That is the idea here — not the calm of
-    deep space, but a point of energy released all at once.</p>
+  <p class="tagline">M-VAVE FM-1 · after the SOMA Pulsar-23 · new audio engine</p>
+  <h1>Percussion synthesizer firmware for the M-VAVE FM-1</h1>
+  <p>Quasar replaces the FM-1's firmware. It models the SOMA Pulsar-23 — BD, BASS, SD and HHT, the SHAOS shift
+    register, the LFO, the clock dividers and the FX processor — with an audio engine written from scratch. 6 tracks,
+    a 16-step sequencer and a phrase generator, aimed at experimental IDM.</p>
   <div class="cta">
     <a class="btn primary" href="install.html">Install via browser</a>
     <a class="btn" href="manual.html">Read the manual</a>
-    <a class="btn" href="lineage.html">The Pulsar-23 lineage</a>
   </div>
 </div>
 
 <section class="demo riveted" id="demo" aria-label="Demo patterns">
   <div class="demo-head">
     <p class="demo-title">Demo phrases</p>
-    <p class="demo-state">Six tracks, phrases drawn by the generator, the stutter on the last beat of every fourth bar.
-      Rendered by the firmware's own code on a computer, not recorded from the device.</p>
+    <p class="demo-state">6 tracks, phrases from the generator, STUTTER on the last beat of every 4th bar. Rendered by
+      the firmware's code on a computer, not recorded from the device.</p>
   </div>
   <canvas class="demo-scope" aria-hidden="true"></canvas>
   <ol class="demo-list">
@@ -100,34 +94,34 @@
 
 <h2>Features</h2>
 <dl class="features">
-  <dt>A new engine</dt>
-  <dd>Written from scratch for this firmware: integer arithmetic on the FM-1's two cores, no tables or code from
-    any other synthesizer. <a href="lineage.html">What it models, and where it had to give way.</a></dd>
+  <dt>New engine</dt>
+  <dd>Written from scratch for this firmware: integer arithmetic on the FM-1's 2 cores, no code or tables from other
+    synthesizers.</dd>
   <dt>16 engine profiles</dt>
-  <dd>The Pulsar-23's four circuits, BD, BASS, SD and HHT, each in several modes: HAMMER, SKIN, WALL, WIRE, TONE,
-    STATIC, METAL, SHAKE, GRIND, FM, PRC, PLUCK. Six tracks; each plays any of them.</dd>
-  <dt>147 families</dt>
-  <dd>HOME draws a sound from the profile's families: kicks, snares, metal, static, grinders, gongs, strings. Each
-    drawing is different. No polite sounds, no drones, no long decays.</dd>
+  <dd>BD, BASS, SD and HHT, plus HAMMER, SKIN, WALL, WIRE, TONE, STATIC, METAL, SHAKE, GRIND, FM, PRC and PLUCK. Each of
+    the 6 tracks plays any of them.</dd>
+  <dt>147 sound families</dt>
+  <dd>HOME draws a random sound from the profile's families: kicks, snares, metal, static, grinders, gongs, strings.
+    Short decays.</dd>
   <dt>Macros and routes</dt>
-  <dd>Four macros on the main knobs, four internal routes per sound from SHAOS, the LFO, the clock dividers or
-    another track's output and envelope.</dd>
+  <dd>4 macros on the main knobs. 4 internal routes per sound, from SHAOS, the LFO, the clock dividers, or another
+    track's output or envelope.</dd>
   <dt>WRECK</dt>
-  <dd>A wavefolder, a ring modulator, sample-rate and bit reduction after every voice.</dd>
+  <dd>Wavefolder, ring modulator, sample-rate and bit reduction after every voice.</dd>
   <dt>Phrase generator</dt>
-  <dd>Polymeters, tracks on their own clocks and directions, crossed Euclidean layers, ratchets, hits pulled off the
-    grid. Locks reach WRECK step by step.</dd>
+  <dd>Polymeters, per-track clock and direction, Euclidean layers, ratchets, off-grid hits. Parameter locks reach
+    WRECK.</dd>
   <dt>BREAK</dt>
-  <dd>Ten ways of breaking a pattern while a key is held, after breakcore and Autechre — shuffled, polymetric,
-    jumping, skipping — with ratchets to 8, rises, wreck and stutter layers. Nothing ever drops out.</dd>
+  <dd>10 ways to break the pattern while a key is held: REPEAT, HALF TIME, DOUBLE, REVERSE, CHOP, ROLL, SHUFFLE, POLY,
+    JUMP, SKIP. Random layers add ratchets up to 8, rises, WRECK and STUTTER.</dd>
   <dt>STUTTER</dt>
-  <dd>A beat repeat of the whole output on its own key, with RND settings so each press is different.</dd>
+  <dd>Beat repeat of the whole output on its own key. SLICE, RATE, MODE and DECAY can each be set to RND.</dd>
   <dt>PERFORMANCE</dt>
-  <dd>A key that keeps the state: change anything, then let it all go back. CTRL ALL moves every track with notes at
-    once. Keep what you like as a pattern.</dd>
-  <dt>From the step sequencer up</dt>
-  <dd>16 steps with eight parameter locks a step, trig conditions, MUTATE and MIDI FX, patterns, sessions, MIDI and
-    MIDI LEARN — the control layer of Bigorna, the same author's FM-1 firmware.</dd>
+  <dd>Change anything, then press the key again to restore the previous state. CTRL ALL applies changes to every track
+    with notes. Save a pattern to keep the result.</dd>
+  <dt>Sequencer</dt>
+  <dd>16 steps, 8 parameter locks per step, trig conditions, MUTATE, MIDI FX, patterns, sessions, MIDI and MIDI LEARN.
+    The control layer comes from Bigorna, the same author's FM-1 firmware.</dd>
 </dl>
 
 <div class="warn">
@@ -153,6 +147,6 @@
     </footer>
   </div>
 </div>
-<script src="js/menu.js?v=bf99baf0ce"></script>
+<script src="js/menu.js?v=3b904a9164"></script>
 </body>
 </html>

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # QUASAR (as BIGORNA's and TONITOR's): the website's generated parts, in docs/ (GitHub Pages):
-#   docs/index.html, screens, lineage, install, backup, projects, apps   site/*.html in the common frame (the home page's
-#                        demos: docs/assets/demo/, `build/host demo` then tools/make_loop.py; its player js/demo.js;
-#                        the lineage page's block diagrams: tools/diagrams.py, in place of {DIAGRAM:name})
+#   docs/index.html, screens, install, backup, projects, apps   site/*.html in the common frame (the home page's
+#                        demos: docs/assets/demo/, `build/host demo` then tools/make_loop.py; its player js/demo.js)
 #   docs/manual.html     the README's manual (from "# Manual" to "# Building from source")
 #   docs/changelog.html  CHANGELOG.md
 #   docs/firmware/       the package the browser installer writes, and latest.json (its file, version, SHA-256)
@@ -141,7 +140,7 @@ def to_html(md, toc):
 
 def page(title, current, body, desc, head=""):
     """every page: the menu down the left (above the content on a narrow screen), the content, the footer"""
-    nav = [("./", "Home"), ("lineage.html", "Lineage"), ("screens.html", "Screens"), ("install.html", "Install"),
+    nav = [("./", "Home"), ("screens.html", "Screens"), ("install.html", "Install"),
            ("backup.html", "Backup"), ("manual.html", "Manual"),
            ("changelog.html", "Changelog"), ("projects.html", "Other projects"), ("apps.html", "Apps"),
            (REPO, "GitHub")]
@@ -210,21 +209,12 @@ def page(title, current, body, desc, head=""):
 
 def fragments():
     src = ROOT / "site"
-    sys.path.insert(0, str(ROOT / "tools"))
-    import diagrams
     demo_v = hashlib.sha256((DOCS / "js" / "demo.js").read_bytes()).hexdigest()[:10]
     (DOCS / "index.html").write_text(page(
         "Quasar — a firmware for the M-VAVE FM-1", "Home", (src / "home.html").read_text().replace("{LOGO_V}", LOGO_V),
         "Quasar: a firmware for the M-VAVE FM-1 for experimental IDM, after the SOMA Pulsar-23, with an audio engine "
         "written from scratch.",
         f'\n<script src="js/demo.js?v={demo_v}" defer></script>'))
-    lin = (src / "lineage.html").read_text()
-    for name, fn in diagrams.DIAGRAMS.items():
-        lin = lin.replace("{DIAGRAM:" + name + "}", fn())
-    (DOCS / "lineage.html").write_text(page(
-        "Quasar and the Pulsar-23", "Lineage", lin,
-        "Where Quasar comes from: the SOMA Pulsar-23, what is modelled, block diagrams of the circuits as written, and "
-        "where the FM-1's chip forced compromises."))
     (DOCS / "screens.html").write_text(page(
         "Quasar on the FM-1's screen", "Screens", (src / "screens.html").read_text(),
         "Quasar on the M-VAVE FM-1's screen: the track view, the sound's pages, STUTTER, PERFORMANCE and the sessions."))
@@ -492,5 +482,5 @@ if __name__ == "__main__":
     manual()
     changelog()
     firmware(Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build" / "quasar.fwsc")
-    print("site: docs/index.html, lineage.html, screens.html, install.html, backup.html, manual.html, changelog.html, "
+    print("site: docs/index.html, screens.html, install.html, backup.html, manual.html, changelog.html, "
           "projects.html, apps.html")

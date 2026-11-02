@@ -185,7 +185,7 @@ main .machine h3 { margin: 0 0 6px; font-size: 19px; }
 footer { padding: 24px 0 40px; color: var(--dim); font-size: 15px; max-width: var(--max); }
 footer p { margin: 4px 0; }
 
-/* documents (manual, changelog, lineage) */
+/* documents (manual, changelog) */
 main table { border-collapse: collapse; width: 100%; margin: 14px 0; display: block; overflow-x: auto; }
 main th, main td { border: 1px solid var(--line); padding: 8px 12px; vertical-align: top; text-align: left; }
 main th { background: var(--plate2); font-family: var(--head); text-transform: uppercase; letter-spacing: 0.05em; font-size: 14px; }
@@ -256,32 +256,6 @@ table.controls td.n a { display: inline-block; min-width: 30px; padding: 1px 0; 
 table.controls tr.hot td { background: #1b1f2b; }
 table.controls tr.hot td.n a { background: #fff; }
 
-/* the lineage: block diagrams of the circuits as modelled */
-.diagram { margin: 22px 0 10px; padding: 18px 18px 10px; background: #07080b; border: 1px solid var(--line); }
-.diagram svg { display: block; width: 100%; height: auto; }
-.diagram figcaption { color: var(--dim); font-size: 15px; margin-top: 8px; }
-.sch .blk { fill: #0e1018; stroke: var(--steel); stroke-width: 2; }
-.sch .blk.new { stroke: var(--hot); }
-.sch .blk.red { stroke: var(--red); }
-.sch .blk.ghost { stroke: var(--mid); stroke-dasharray: 5 5; }
-.sch .t { fill: var(--fg); font: 700 15px "Atkinson Hyperlegible", system-ui, sans-serif; text-anchor: middle; }
-.sch .s { fill: var(--dim); font: 400 12px var(--mono); text-anchor: middle; }
-.sch .w { fill: none; stroke: #c8cde0; stroke-width: 2; }
-.sch .w.cv { stroke: var(--hot); stroke-dasharray: 6 4; }
-.sch .w.gate { stroke: var(--red); stroke-dasharray: 2 4; }
-.sch .ar { fill: #c8cde0; }
-.sch .ar.cv { fill: var(--hot); }
-.sch .ar.gate { fill: var(--red); }
-.sch .pin { fill: var(--bg); stroke: #c8cde0; stroke-width: 2; }
-.sch .lbl { fill: var(--dim); font: 400 12px var(--mono); }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 6px 0 0; padding: 0; list-style: none; color: var(--dim); font-size: 15px; }
-.legend li::before { content: ""; display: inline-block; width: 26px; height: 0; margin-right: 8px; vertical-align: middle;
-                     border-top: 2px solid #c8cde0; }
-.legend li.cv::before { border-top: 2px dashed var(--hot); }
-.legend li.gate::before { border-top: 2px dotted var(--red); }
-.legend li.new::before { height: 12px; border: 2px solid var(--hot); border-top-width: 2px; width: 18px; }
-.cmp td:nth-child(2) { color: var(--fg); }
-.cmp td:nth-child(3) { color: var(--dim); }
 .tagline, .hero .tagline { font-family: var(--mono); font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--hot); margin: 0 0 6px; }
 
 /* other projects */
