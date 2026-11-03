@@ -186,10 +186,7 @@ def page(title, current, body, desc, head=""):
 {body}
     </main>
     <footer>
-      <p>Developed by Nuno Zimas. Firmware: GPL-3.0. Website and logo: MIT. <a href="{REPO}">Source on GitHub</a>.</p>
-      <p>M-VAVE and FM-1 are trademarks of their owner; SOMA Laboratory and Pulsar-23 are trademarks of SOMA Laboratory;
-        Elektron is trademark of Elektron Music Machines. They are used only to say which device Quasar runs on and
-        which instrument it takes as its model. Quasar is not made, endorsed or supported by any of them.</p>
+      <p>Developed by <a href="https://nunozimas.com">Nuno Zimas</a>.</p>
       <form class="donate donate-foot" action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
         <input type="hidden" name="cmd" value="_xclick">
         <input type="hidden" name="business" value="nzimas.lv@gmail.com">
